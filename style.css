@@ -71,6 +71,8 @@ button {
     font-weight: 700;
     font-size: 16px;
     box-sizing: border-box;
+    white-space: nowrap;
+    line-height: 1.5;
     transition: all 0.2s ease;
     box-shadow: 0 4px 12px rgba(49, 130, 246, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3);
 }
@@ -250,10 +252,10 @@ button:active { transform: translateY(0); }
 }
 
 /* JS 버튼 인라인 스타일 오버라이드 (그라데이션 & 입체감 적용) */
-button[style*="--secondary-color"], button[style*="#4CAF50"] { background: var(--secondary-grad) !important; box-shadow: 0 4px 12px rgba(4, 192, 158, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important; }
-button[style*="--danger-color"], button[style*="#f44336"] { background: var(--danger-grad) !important; box-shadow: 0 4px 12px rgba(240, 68, 82, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important; }
-button[style*="--dark-gray"], button[style*="#6b7280"], button[style*="#9ca3af"], button[style*="#4b5563"] { background: linear-gradient(135deg, #8b95a1 0%, #6b7684 100%) !important; box-shadow: 0 4px 12px rgba(139, 149, 161, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.2) !important; }
-button[style*="--primary-color"] { background: var(--primary-grad) !important; box-shadow: 0 4px 12px rgba(49, 130, 246, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important; }
+button[style*="--secondary-color"], button[style*="#4CAF50"] { background: var(--secondary-grad) !important; color: white !important; box-shadow: 0 4px 12px rgba(4, 192, 158, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important; }
+button[style*="--danger-color"], button[style*="#f44336"] { background: var(--danger-grad) !important; color: white !important; box-shadow: 0 4px 12px rgba(240, 68, 82, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important; }
+button[style*="--dark-gray"], button[style*="#6b7280"], button[style*="#9ca3af"], button[style*="#4b5563"] { background: linear-gradient(135deg, #8b95a1 0%, #6b7684 100%) !important; color: white !important; box-shadow: 0 4px 12px rgba(139, 149, 161, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.2) !important; }
+button[style*="--primary-color"] { background: var(--primary-grad) !important; color: white !important; box-shadow: 0 4px 12px rgba(49, 130, 246, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important; }
 
 /* JS 인라인 스타일 오버라이드 (SaaS 톤 통일) */
 [style*="color: #666"], [style*="color:#666"] { color: var(--text-muted) !important; }
