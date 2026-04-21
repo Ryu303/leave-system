@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>연차 관리 시스템</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="card" id="userView">
+            <h2>📅 연차 관리 시스템</h2>
+            <div id="loginSection">
+                <p>이름과 비밀번호를 입력하여 로그인하세요.</p>
+                <input type="text" id="nameInput" placeholder="이름 (예: 류재진)">
+                <input type="password" id="loginPasswordInput" placeholder="비밀번호">
+                <button onclick="fetchUser()">로그인</button>
+                <a class="admin-toggle" onclick="showAdminView()">👑 관리자 페이지 접속</a>
+            </div>
+
+            <div id="registerView" style="display:none; margin-top: 20px;">
+                <h4>✨ 신규 사용자 등록</h4>
+                <p><strong id="newUserName" style="color: var(--primary-color);"></strong>님을 등록합니다.<br>초기 연차 개수를 입력해주세요.</p>
+                <input type="number" id="initialLeaveInput" placeholder="초기 연차 개수 (예: 15)" value="15">
+                <input type="password" id="registerPasswordInput" placeholder="비밀번호 재확인" readonly style="background-color: #f3f4f6; color: #6b7280; outline: none;">
+                <button onclick="registerUser()" style="background:var(--secondary-color);">등록하기</button>
+            </div>
+
+            <div id="info" style="display:none;">
+                <div style="text-align: right; margin-bottom: 15px;">
+                    <strong id="loggedInUserName" style="color: var(--primary-color);"></strong>님 환영합니다. 
+                    <button onclick="logout()" style="width: auto; padding: 5px 12px; margin-left: 10px; background: var(--dark-gray); font-size: 12px; border-radius: 6px;">로그아웃</button>
+                </div>
+                <div class="status">
+                    <div>남은 연차<strong id="remain">0</strong></div>
+                    <div>사용 연차<strong id="used">0</strong></div>
+                </div>
+                
+                <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+                
+                <h4>연차 신청</h4>
+                <input type="date" id="date">
+                <select id="type">
+                    <option value="1">연차 (1일)</option>
+                    <option value="0.5">반차 (0.5일)</option>
+                </select>
+                <button onclick="applyLeave()" style="background:var(--secondary-color);">신청하기</button>
+
+                <div id="calendarContainer">
+                    <div class="calendar-header">
+                        <button onclick="changeMonth(-1)">‹</button>
+                        <h4 id="calendarTitle" style="margin: 0;"></h4>
+                        <button onclick="changeMonth(1)">›</button>
+                    </div>
+                    <div id="calendarGrid"></div>
+                </div>
+
+                <div id="history" class="history"></div>
+            </div>
+        </div>
+
+        <div class="card" id="adminView">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin: 0;">👑 팀원 연차 현황</h2>
+                <button onclick="logout()" style="width: auto; padding: 5px 12px; margin: 0; background: var(--dark-gray); font-size: 12px; border-radius: 6px;">로그아웃</button>
+            </div>
+            <p>전체 팀원의 남은 연차를 확인합니다.</p>
+            <div id="userList" style="margin-top: 20px;"></div>
+        </div>
+    </div>
+
+    <!-- 커스텀 팝업 (모달) -->
+    <div id="customModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <p id="modalMessage"></p>
+            <input type="text" id="modalInput" style="display: none;" placeholder="입력해주세요...">
+            <div class="modal-buttons">
+                <button id="modalCancelBtn" class="cancel-btn" style="display: none;">취소</button>
+                <button id="modalConfirmBtn">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

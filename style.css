@@ -1,0 +1,162 @@
+:root {
+    --primary-color: #6366f1;
+    --secondary-color: #10b981;
+    --danger-color: #ef4444;
+    --light-gray: #f3f4f6;
+    --dark-gray: #4b5563;
+    --text-color: #1f2937;
+}
+body {
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 50px;
+    background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);
+    min-height: 100vh;
+    margin: 0;
+    box-sizing: border-box;
+}
+.container { width: 100%; max-width: 500px; }
+.card {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    padding: 30px;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+}
+input, select, button {
+    width: 100%;
+    padding: 14px;
+    margin: 10px 0;
+    border-radius: 8px;
+    border: 1px solid #d1d5db;
+    box-sizing: border-box;
+    font-size: 16px;
+}
+button {
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.3s ease;
+}
+button:hover { background: #4338ca; }
+.status {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    text-align: center;
+    margin: 25px 0;
+}
+.status > div {
+    background: var(--light-gray);
+    padding: 15px;
+    border-radius: 8px;
+}
+.status strong { font-size: 24px; color: var(--primary-color); display: block; }
+.history { margin-top: 20px; font-size: 14px; border-top: 1px solid #eee; }
+.history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 5px;
+    border-bottom: 1px solid #e5e7eb;
+}
+.delete-btn {
+    background: var(--danger-color);
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    width: auto;
+    margin: 0;
+}
+.admin-toggle {
+    display: block;
+    text-align: center;
+    margin-top: 20px;
+    color: var(--primary-color);
+    cursor: pointer;
+    font-weight: 500;
+    text-decoration: underline;
+}
+#adminView { display: none; }
+.user-list-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px;
+    background: var(--light-gray);
+    border-radius: 6px;
+    margin-bottom: 8px;
+}
+/* Calendar Styles */
+#calendarContainer { margin-top: 30px; }
+.calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.calendar-header button { width: auto; padding: 5px 15px; margin: 0; }
+#calendarGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; }
+.calendar-day-name { font-weight: 600; font-size: 12px; color: var(--dark-gray); padding-bottom: 5px;}
+.calendar-day { padding: 10px 0; border-radius: 50%; position: relative; font-size: 14px;}
+.calendar-day.other-month { color: #ccc; }
+.calendar-day:not(.other-month) { cursor: pointer; transition: background-color 0.2s; }
+.calendar-day:not(.other-month):hover { background-color: #e0e7ff; }
+.calendar-day.has-leave::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--secondary-color);
+}
+.calendar-day.has-half-leave::after { background-color: #f59e0b; }
+
+/* 커스텀 모달 (팝업) 스타일 */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    backdrop-filter: blur(3px);
+}
+.modal-content {
+    background: white;
+    padding: 25px;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 320px;
+    text-align: center;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+}
+.modal-content p {
+    margin-top: 0; margin-bottom: 20px;
+    color: var(--text-color);
+    line-height: 1.5;
+    white-space: pre-wrap; /* 줄바꿈 유지 */
+}
+.modal-content button {
+    flex: 1; padding: 10px 0; margin: 0;
+}
+.modal-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+.cancel-btn {
+    background: var(--dark-gray);
+}
+.cancel-btn:hover {
+    background: #374151;
+}
+#modalInput {
+    margin-bottom: 20px;
+}
