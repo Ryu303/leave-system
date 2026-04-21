@@ -236,42 +236,91 @@ async function changeMyPassword() {
     showModal('비밀번호가 성공적으로 변경되었습니다.');
 }
 
+// 여러 날짜 신청 토글
+function toggleRangeInput() {
+    const isRange = document.getElementById('isRange').checked;
+    document.getElementById('endDate').style.display = isRange ? 'block' : 'none';
+    document.getElementById('rangeTilde').style.display = isRange ? 'block' : 'none';
+    
+    const typeSelect = document.getElementById('type');
+    if (isRange) {
+        typeSelect.value = "1";
+        typeSelect.disabled = true; // 기간 신청은 '연차'만 가능
+    } else {
+        typeSelect.disabled = false;
+    }
+}
+
 // 연차 신청
 function applyLeave() {
-    const type = parseFloat(document.getElementById('type').value);
-    const date = document.getElementById('date').value;
+    const isRange = document.getElementById('isRange').checked;
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const typeValue = document.getElementById('type').value;
     
-    if (!date) return showModal('날짜를 선택하세요.');
-
     const user = db[currentName];
     if (!user.history) user.history = []; // Firebase 빈 배열 삭제 대응
 
-    // 잔여 연차 확인
-    if (user.total - user.used < type) {
-        return showModal('잔여 연차가 부족합니다.');
+    let datesToApply = [];
+    let deductionPerDay = 1;
+    let subType = typeValue; 
+    let typeNum = typeValue.startsWith('0.5') ? 0.5 : 1;
+
+    if (!isRange) {
+        if (!startDate) return showModal('날짜를 선택하세요.');
+        datesToApply.push(startDate);
+        deductionPerDay = typeNum;
+    } else {
+        if (!startDate || !endDate) return showModal('시작일과 종료일을 모두 선택하세요.');
+        if (startDate > endDate) return showModal('종료일이 시작일보다 앞설 수 없습니다.');
+        
+        let curr = new Date(startDate);
+        let end = new Date(endDate);
+        while (curr <= end) {
+            // 주말(토=6, 일=0) 제외
+            if (curr.getDay() !== 0 && curr.getDay() !== 6) {
+                const dStr = `${curr.getFullYear()}-${String(curr.getMonth()+1).padStart(2,'0')}-${String(curr.getDate()).padStart(2,'0')}`;
+                datesToApply.push(dStr);
+            }
+            curr.setDate(curr.getDate() + 1);
+        }
+        if (datesToApply.length === 0) return showModal('선택한 기간 내에 신청 가능한 평일이 없습니다.');
+        deductionPerDay = 1; 
+        subType = '1';
     }
 
-    // 1. 중복 신청 방지
-    const alreadyApplied = user.history.some(h => h.date === date && h.status !== 'rejected');
-    if (alreadyApplied) {
-        return showModal('이미 해당 날짜에 신청한 기록이 있습니다.');
+    const totalDeduction = datesToApply.length * deductionPerDay;
+    if (user.total - user.used < totalDeduction) {
+        return showModal(`잔여 연차가 부족합니다. (필요: ${totalDeduction}일)`);
     }
 
-    // 2. 하루 2명 제한 로직
-    let peopleOnLeave = 0;
-    for (let p in db) {
-        if (db[p].history && db[p].history.some(h => h.date === date && h.status !== 'rejected')) {
-            peopleOnLeave++;
+    for (let d of datesToApply) {
+        if (user.history.some(h => h.date === d && h.status !== 'rejected')) {
+            return showModal(`${d}에는 이미 신청한 기록이 있습니다.`);
         }
     }
-    if (peopleOnLeave >= 2) {
-        return showModal(`${date}에는 이미 2명이 신청하여 더 이상 신청할 수 없습니다.`);
+
+    for (let d of datesToApply) {
+        let peopleOnLeave = 0;
+        for (let p in db) {
+            if (db[p].history && db[p].history.some(h => h.date === d && h.status !== 'rejected')) {
+                peopleOnLeave++;
+            }
+        }
+        if (peopleOnLeave >= 2) {
+            return showModal(`${d}에는 이미 2명이 신청하여 더 이상 신청할 수 없습니다.`);
+        }
     }
 
-    // 등록 처리
-    user.used += type; // 승인 대기여도 잔여 연차 우선 차감
-    user.history.push({ id: generateId(), date: date, type: type, status: 'pending' });
+    datesToApply.forEach(d => {
+        user.used += deductionPerDay;
+        user.history.push({ id: generateId(), date: d, type: deductionPerDay, subType: subType, status: 'pending' });
+    });
     saveDB();
+    
+    if (isRange && datesToApply.length > 1) {
+        showModal(`${datesToApply.length}일의 연차가 신청되었습니다. (주말 자동 제외됨)`);
+    }
 }
 
 // 연차 취소(삭제)
@@ -295,7 +344,7 @@ async function deleteLeave(leaveId) {
 
 // 달력 날짜 클릭 시 인풋에 값 넣기
 function selectDateFromCalendar(dateString) {
-    document.getElementById('date').value = dateString;
+    document.getElementById('startDate').value = dateString;
 }
 
 // 화면 업데이트 로직
@@ -309,7 +358,8 @@ function updateUI() {
     user.history.forEach(h => {
         if ((h.status === 'approved' || h.status === 'rejected') && !h.notified) {
             const statusMsg = h.status === 'approved' ? '승인' : '반려';
-            combinedMsg += `[알림] ${h.date} (${h.type == 1 ? '연차' : '반차'}) 신청이 ${statusMsg}되었습니다.\n`;
+            const typeStr = h.type == 1 ? '연차' : (h.subType === '0.5pm' ? '오후 반차' : (h.subType === '0.5am' ? '오전 반차' : '반차'));
+            combinedMsg += `[알림] ${h.date} (${typeStr}) 신청이 ${statusMsg}되었습니다.\n`;
             if (h.reason) {
                 combinedMsg += `사유: ${h.reason}\n`;
             }
@@ -355,9 +405,10 @@ function updateUI() {
             const item = document.createElement('div');
             item.className = 'history-item';
             item.style.alignItems = 'flex-start'; // 사유가 추가되어 여러 줄이 될 수 있으므로 위쪽 정렬
+            const typeStr = h.type == 1 ? '연차' : (h.subType === '0.5pm' ? '오후 반차' : (h.subType === '0.5am' ? '오전 반차' : '반차'));
             item.innerHTML = `
                 <div>
-                    <span>${h.date} - <strong>${h.type == 1 ? '연차' : '반차'}</strong> 
+                    <span>${h.date} - <strong>${typeStr}</strong> 
                     <span style="color:${statusColor}; font-size: 0.8em; margin-left: 5px;">[${statusText}]</span></span>
                     ${h.reason ? `<div style="font-size: 0.85em; color: #666; margin-top: 5px;">사유: ${h.reason}</div>` : ''}
                 </div>
@@ -414,7 +465,14 @@ async function showAdminView() {
 
     // 승인 대기 목록 렌더링
     const pendingContainer = document.createElement('div');
-    pendingContainer.innerHTML = '<h3 style="margin-top: 30px;">승인 대기 중인 신청</h3>';
+    const pendingHeader = document.createElement('div');
+    pendingHeader.style.display = 'flex';
+    pendingHeader.style.justifyContent = 'space-between';
+    pendingHeader.style.alignItems = 'center';
+    pendingHeader.style.marginTop = '30px';
+    pendingHeader.innerHTML = '<h3 style="margin: 0;">승인 대기 중인 신청</h3>';
+    
+    const pendingList = document.createElement('div');
     let hasPending = false;
 
     users.forEach(name => {
@@ -429,19 +487,25 @@ async function showAdminView() {
                 item.style.border = '1px solid #ddd';
                 item.style.padding = '10px';
                 item.style.marginTop = '10px';
+                const typeStr = h.type == 1 ? '연차' : (h.subType === '0.5pm' ? '오후 반차' : (h.subType === '0.5am' ? '오전 반차' : '반차'));
                 item.innerHTML = `
-                    <div style="margin-bottom: 5px;"><strong>${name}</strong> - ${h.date} (${h.type == 1 ? '연차' : '반차'})</div>
+                    <div style="margin-bottom: 5px;"><strong>${name}</strong> - ${h.date} (${typeStr})</div>
                     <button onclick="approveLeave('${name}', '${h.id}')" style="background: #4CAF50; color: white; border: none; padding: 5px 10px; cursor: pointer;">승인</button>
                     <button onclick="rejectLeave('${name}', '${h.id}')" style="background: #f44336; color: white; border: none; padding: 5px 10px; cursor: pointer; margin-left: 5px;">반려</button>
                 `;
-                pendingContainer.appendChild(item);
+                pendingList.appendChild(item);
             }
         });
     });
 
     if (!hasPending) {
-        pendingContainer.innerHTML += '<p style="color:#666;">대기 중인 신청이 없습니다.</p>';
+        pendingList.innerHTML = '<p style="color:#666; margin-top: 10px;">대기 중인 신청이 없습니다.</p>';
+    } else {
+        pendingHeader.innerHTML += `<button onclick="approveAllLeaves()" style="width: auto; padding: 5px 12px; margin: 0; background: var(--secondary-color); font-size: 12px; border-radius: 6px;">모두 승인</button>`;
     }
+    
+    pendingContainer.appendChild(pendingHeader);
+    pendingContainer.appendChild(pendingList);
     userListContainer.appendChild(pendingContainer);
 
     // 전체 팀원 달력 렌더링
@@ -462,6 +526,35 @@ async function approveLeave(userName, leaveId) {
         
         record.notified = false; // 사용자에게 알림을 띄우기 위해 상태 초기화
         saveDB();
+    }
+}
+
+// 관리자: 모든 대기 건 일괄 승인
+async function approveAllLeaves() {
+    const confirmed = await openModal('모든 대기 중인 신청을 일괄 승인하시겠습니까?', 'confirm');
+    if (!confirmed) return;
+
+    const reason = await openModal('일괄 승인 사유를 입력하세요 (선택사항, 입력하지 않아도 됩니다):', 'prompt');
+    if (reason === null) return; // '취소' 클릭 시 진행 중단
+
+    let count = 0;
+    for (let name in db) {
+        if (db[name].history) {
+            db[name].history.forEach(h => {
+                if (h.status === 'pending') {
+                    h.status = 'approved';
+                    if (reason.trim() !== '') h.reason = reason.trim();
+                    h.notified = false; // 사용자에게 알림 띄우기
+                    count++;
+                }
+            });
+        }
+    }
+
+    if (count > 0) {
+        saveDB();
+        showModal(`${count}건의 신청이 일괄 승인되었습니다.`);
+        showAdminView(); // 목록 새로고침
     }
 }
 
@@ -560,11 +653,14 @@ function renderCalendar(year, month, history) {
         };
 
         // 해당 날짜에 연차 기록이 있는지 확인
-        const leaveOnDay = history.find(h => h.date === currentDateStr && h.status !== 'rejected');
+        const leaveOnDay = history.find(h => h.date === currentDateStr && h.status !== 'rejected' && h.status !== 'canceled');
         if (leaveOnDay) {
-            dayEl.classList.add('has-leave');
-            if (leaveOnDay.type == 0.5) {
-                dayEl.classList.add('has-half-leave');
+            if (leaveOnDay.type == 1) {
+                dayEl.classList.add('has-leave');
+            } else if (leaveOnDay.subType === '0.5pm') {
+                dayEl.classList.add('has-half-pm-leave');
+            } else {
+                dayEl.classList.add('has-half-am-leave');
             }
         }
         grid.appendChild(dayEl);
@@ -614,12 +710,26 @@ function renderAdminCalendar(year, month) {
         // 해당 날짜에 연차 기록이 있는 모든 사용자 찾기
         for (let name in db) {
             if (db[name].history) {
-                const leave = db[name].history.find(h => h.date === currentDateStr && h.status !== 'rejected');
+                const leave = db[name].history.find(h => h.date === currentDateStr && h.status !== 'rejected' && h.status !== 'canceled');
                 if (leave) {
                     const tag = document.createElement('div');
-                    tag.className = `admin-leave-tag ${leave.type == 1 ? 'full' : 'half'} ${leave.status === 'pending' ? 'pending' : ''}`;
-                    tag.innerText = `${name}${leave.type == 0.5 ? '(반)' : ''}`;
-                    tag.title = `${name} - ${leave.type == 1 ? '연차' : '반차'} ${leave.status === 'pending' ? '(대기중)' : '(승인됨)'}`;
+                    let tagClass = 'full';
+                    let tagText = name;
+                    let typeLabel = '연차';
+                    
+                    if (leave.type == 0.5) {
+                        if (leave.subType === '0.5pm') {
+                            tagClass = 'half-pm'; tagText += '(오후)'; typeLabel = '오후 반차';
+                        } else if (leave.subType === '0.5am') {
+                            tagClass = 'half-am'; tagText += '(오전)'; typeLabel = '오전 반차';
+                        } else {
+                            tagClass = 'half-am'; tagText += '(반)'; typeLabel = '반차'; // 과거 데이터용
+                        }
+                    }
+                    
+                    tag.className = `admin-leave-tag ${tagClass} ${leave.status === 'pending' ? 'pending' : ''}`;
+                    tag.innerText = tagText;
+                    tag.title = `${name} - ${typeLabel} ${leave.status === 'pending' ? '(대기중)' : '(승인됨)'}`;
                     dayEl.appendChild(tag);
                 }
             }

@@ -1,72 +1,109 @@
 :root {
-    --primary-color: #6366f1;
+    --primary-color: #4f46e5;
+    --primary-hover: #4338ca;
     --secondary-color: #10b981;
     --danger-color: #ef4444;
-    --light-gray: #f3f4f6;
-    --dark-gray: #4b5563;
-    --text-color: #1f2937;
+    --bg-color: #f8fafc;
+    --card-bg: #ffffff;
+    --border-color: #e2e8f0;
+    --light-gray: #f1f5f9;
+    --dark-gray: #64748b;
+    --text-color: #0f172a;
+    --text-muted: #64748b;
 }
 body {
-    font-family: 'Inter', sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    padding: 50px;
-    background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);
+    padding: 40px 20px;
+    background: var(--bg-color);
     min-height: 100vh;
     margin: 0;
     box-sizing: border-box;
     color: var(--text-color);
     transition: background 0.3s, color 0.3s;
 }
-.container { width: 100%; max-width: 500px; }
+.container { width: 100%; max-width: 540px; }
 .card {
-    background: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(10px);
-    padding: 30px;
+    background: var(--card-bg);
+    padding: 40px;
     border-radius: 16px;
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+    border: 1px solid var(--border-color);
+    transition: background 0.3s, border-color 0.3s;
 }
-input, select, button {
+hr { border: none; border-top: 1px solid var(--border-color) !important; }
+input, select {
     width: 100%;
-    padding: 14px;
-    margin: 10px 0;
+    padding: 12px 16px;
+    margin: 8px 0 16px;
     border-radius: 8px;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--border-color);
+    background-color: var(--card-bg);
+    color: var(--text-color);
     box-sizing: border-box;
-    font-size: 16px;
+    font-size: 15px;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02);
+}
+input:focus, select:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
 }
 button {
+    width: 100%;
+    padding: 12px 16px;
+    margin: 8px 0;
+    border-radius: 8px;
     background: var(--primary-color);
     color: white;
     border: none;
     cursor: pointer;
     font-weight: 600;
-    transition: background 0.3s ease;
+    font-size: 15px;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
 }
-button:hover { background: #4338ca; }
+.button:hover, button:hover { background: var(--primary-hover); transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+button:active { transform: translateY(0); }
+.dark-mode-toggle {
+    position: fixed; top: 20px; right: 20px; width: 45px; height: 45px; padding: 0;
+    border-radius: 50%; background: var(--card-bg); border: 1px solid var(--border-color);
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); font-size: 20px; cursor: pointer;
+    z-index: 1000; display: flex; align-items: center; justify-content: center;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); color: var(--text-color);
+}
+.dark-mode-toggle:hover { transform: scale(1.1); }
 .status {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 15px;
+    gap: 16px;
     text-align: center;
-    margin: 25px 0;
+    margin: 24px 0;
 }
 .status > div {
-    background: var(--light-gray);
-    padding: 15px;
-    border-radius: 8px;
+    background: var(--card-bg);
+    padding: 20px 15px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 500;
 }
-.status strong { font-size: 24px; color: var(--primary-color); display: block; }
-.history { margin-top: 20px; font-size: 14px; border-top: 1px solid #eee; }
+.status strong { font-size: 28px; color: var(--primary-color); display: block; margin-top: 8px; font-weight: 700; }
+.history { margin-top: 24px; font-size: 14px; border-top: 1px solid var(--border-color); padding-top: 16px; }
 .history-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 5px;
-    border-bottom: 1px solid #e5e7eb;
+    padding: 12px 8px;
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.2s;
 }
+.history-item:hover { background-color: var(--light-gray); border-radius: 6px; }
 .delete-btn {
     background: var(--danger-color);
     color: white;
@@ -85,28 +122,34 @@ button:hover { background: #4338ca; }
     color: var(--primary-color);
     cursor: pointer;
     font-weight: 500;
-    text-decoration: underline;
+    text-decoration: none;
+    transition: color 0.2s;
 }
+.admin-toggle:hover { color: var(--primary-hover); text-decoration: underline; }
 #adminView { display: none; }
 .user-list-item {
     display: flex;
     justify-content: space-between;
-    padding: 12px;
-    background: var(--light-gray);
-    border-radius: 6px;
-    margin-bottom: 8px;
+    padding: 16px;
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
+    border-radius: 10px;
+    margin-bottom: 10px;
+    transition: transform 0.2s;
 }
+.user-list-item:hover { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
 /* Calendar Styles */
 #calendarContainer { margin-top: 30px; }
 .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
 .calendar-header button { width: auto; padding: 5px 15px; margin: 0; }
 #calendarGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; }
-.calendar-day-name { font-weight: 600; font-size: 12px; color: var(--dark-gray); padding-bottom: 5px;}
-.calendar-day { padding: 10px 0; border-radius: 50%; position: relative; font-size: 14px;}
+.calendar-day-name { font-weight: 600; font-size: 12px; color: var(--text-muted); padding-bottom: 5px;}
+.calendar-day { padding: 10px 0; border-radius: 8px; position: relative; font-size: 14px;}
 .calendar-day.other-month { color: #ccc; }
 .calendar-day:not(.other-month) { cursor: pointer; transition: background-color 0.2s; }
-.calendar-day:not(.other-month):hover { background-color: #e0e7ff; }
-.calendar-day.selected { background-color: #e0e7ff; }
+.calendar-day:not(.other-month):hover { background-color: var(--light-gray); }
+.calendar-day.selected { background-color: var(--light-gray); border: 1px solid var(--primary-color); }
 .calendar-day.has-leave::after {
     content: '';
     position: absolute;
@@ -118,12 +161,19 @@ button:hover { background: #4338ca; }
     border-radius: 50%;
     background-color: var(--secondary-color);
 }
-.calendar-day.has-half-leave::after { background-color: #f59e0b; }
+.calendar-day.has-half-am-leave::after {
+    content: ''; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
+    width: 6px; height: 6px; border-radius: 50%; background-color: #f59e0b; /* 오전: 주황색 */
+}
+.calendar-day.has-half-pm-leave::after {
+    content: ''; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
+    width: 6px; height: 6px; border-radius: 50%; background-color: #8b5cf6; /* 오후: 보라색 */
+}
 
 /* Admin Calendar Styles (관리자용 달력) */
 #adminCalendarGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; }
-.admin-calendar-day-name { font-weight: 600; font-size: 12px; color: var(--dark-gray); padding-bottom: 5px;}
-.admin-calendar-day { padding: 5px 2px; border-radius: 6px; border: 1px solid #e5e7eb; min-height: 55px; display: flex; flex-direction: column; align-items: center; font-size: 12px; background: #fff;}
+.admin-calendar-day-name { font-weight: 600; font-size: 12px; color: var(--text-muted); padding-bottom: 5px;}
+.admin-calendar-day { padding: 5px 2px; border-radius: 6px; border: 1px solid var(--border-color); min-height: 55px; display: flex; flex-direction: column; align-items: center; font-size: 12px; background: var(--card-bg);}
 .admin-leave-tag {
     font-size: 10px;
     color: white;
@@ -137,7 +187,8 @@ button:hover { background: #4338ca; }
     text-overflow: ellipsis;
 }
 .admin-leave-tag.full { background-color: var(--secondary-color); }
-.admin-leave-tag.half { background-color: #f59e0b; }
+.admin-leave-tag.half-am { background-color: #f59e0b; }
+.admin-leave-tag.half-pm { background-color: #8b5cf6; }
 .admin-leave-tag.pending { opacity: 0.6; }
 
 /* 커스텀 모달 (팝업) 스타일 */
@@ -152,13 +203,14 @@ button:hover { background: #4338ca; }
     backdrop-filter: blur(3px);
 }
 .modal-content {
-    background: white;
-    padding: 25px;
-    border-radius: 12px;
+    background: var(--card-bg);
+    padding: 30px 25px;
+    border-radius: 16px;
     width: 90%;
-    max-width: 320px;
+    max-width: 360px;
     text-align: center;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+    border: 1px solid var(--border-color);
 }
 .modal-content p {
     margin-top: 0; margin-bottom: 20px;
@@ -184,48 +236,39 @@ button:hover { background: #4338ca; }
     margin-bottom: 20px;
 }
 
+/* JS 인라인 스타일 오버라이드 (SaaS 톤 통일) */
+[style*="color: #666"], [style*="color:#666"] { color: var(--text-muted) !important; }
+[style*="border: 1px solid #ddd"] { border-color: var(--border-color) !important; }
+
 /* 다크 모드 (Dark Mode) 스타일 */
 body.dark-mode {
-    --light-gray: #374151;
-    --dark-gray: #9ca3af;
-    --text-color: #f9fafb;
-    background: linear-gradient(135deg, #1e1b4b 0%, #111827 100%);
+    --bg-color: #0f172a;
+    --card-bg: #1e293b;
+    --border-color: #334155;
+    --light-gray: #334155;
+    --dark-gray: #94a3b8;
+    --text-color: #f8fafc;
+    --text-muted: #cbd5e1;
 }
-body.dark-mode #darkModeToggle { background: rgba(0, 0, 0, 0.4) !important; border-color: rgba(255, 255, 255, 0.1) !important; }
-body.dark-mode .card { background: rgba(31, 41, 55, 0.85); border-color: rgba(255, 255, 255, 0.1); }
-body.dark-mode input, body.dark-mode select { background-color: #4b5563; color: #f9fafb; border-color: #6b7280; }
-body.dark-mode input::placeholder { color: #9ca3af; }
-body.dark-mode hr { border-top-color: #4b5563 !important; }
-body.dark-mode .history { border-top-color: #4b5563; }
-body.dark-mode .history-item { border-bottom-color: #4b5563; }
-body.dark-mode .calendar-day:not(.other-month):hover { background-color: #4b5563; }
-body.dark-mode .calendar-day.selected { background-color: #4b5563; }
-body.dark-mode .admin-calendar-day { background: #374151; border-color: #4b5563; }
-body.dark-mode .modal-content { background: #1f2937; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
-body.dark-mode .modal-overlay { background: rgba(0,0,0,0.6); }
-body.dark-mode [style*="color: #666"], body.dark-mode [style*="color:#666"] { color: #9ca3af !important; }
-body.dark-mode [style*="border: 1px solid #ddd"] { border-color: #4b5563 !important; }
+body.dark-mode .modal-overlay { background: rgba(15,23,42,0.8); backdrop-filter: blur(4px); }
 
 /* 반응형 (모바일) 스타일 */
 @media (max-width: 600px) {
     body {
-        padding: 20px 15px;
+        padding: 16px 10px;
     }
     .card {
-        padding: 20px 15px;
-    }
-    input, select, button {
-        padding: 12px;
-        font-size: 14px;
+        padding: 24px 20px;
     }
     .status {
-        gap: 10px;
+        gap: 12px;
+        margin: 20px 0;
     }
     .status > div {
-        padding: 10px;
+        padding: 16px 10px;
     }
-    .status strong { font-size: 20px; }
-    .calendar-day { padding: 8px 0; font-size: 12px; }
+    .status strong { font-size: 24px; }
+    .calendar-day { padding: 8px 0; font-size: 13px; }
     .admin-calendar-day { min-height: 45px; padding: 3px 1px; }
     .admin-leave-tag { font-size: 9px; padding: 1px 2px; border-radius: 2px; }
     #darkModeToggle {
