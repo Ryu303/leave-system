@@ -17,7 +17,7 @@ body {
     justify-content: center;
     align-items: flex-start;
     padding: 40px 20px;
-    background: var(--bg-color);
+    background: var(--bg-grad);
     min-height: 100vh;
     margin: 0;
     box-sizing: border-box;
@@ -159,15 +159,16 @@ button:active { transform: translateY(0); }
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background-color: var(--secondary-color);
+    background: var(--secondary-grad);
+    box-shadow: 0 2px 4px rgba(4, 192, 158, 0.4);
 }
 .calendar-day.has-half-am-leave::after {
     content: ''; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
-    width: 6px; height: 6px; border-radius: 50%; background-color: #f59e0b; /* 오전: 주황색 */
+    width: 6px; height: 6px; border-radius: 50%; background: linear-gradient(135deg, #fbb832 0%, #e68d00 100%); box-shadow: 0 2px 4px rgba(245, 158, 11, 0.4);
 }
 .calendar-day.has-half-pm-leave::after {
     content: ''; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
-    width: 6px; height: 6px; border-radius: 50%; background-color: #8b5cf6; /* 오후: 보라색 */
+    width: 6px; height: 6px; border-radius: 50%; background: linear-gradient(135deg, #9b72f8 0%, #7038e8 100%); box-shadow: 0 2px 4px rgba(139, 92, 246, 0.4);
 }
 
 /* Admin Calendar Styles (관리자용 달력) */
@@ -237,13 +238,19 @@ button:active { transform: translateY(0); }
     margin-bottom: 20px;
 }
 
+/* JS 버튼 인라인 스타일 오버라이드 (그라데이션 & 입체감 적용) */
+button[style*="--secondary-color"], button[style*="#4CAF50"] { background: var(--secondary-grad) !important; box-shadow: 0 4px 12px rgba(4, 192, 158, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important; }
+button[style*="--danger-color"], button[style*="#f44336"] { background: var(--danger-grad) !important; box-shadow: 0 4px 12px rgba(240, 68, 82, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important; }
+button[style*="--dark-gray"], button[style*="#6b7280"], button[style*="#9ca3af"], button[style*="#4b5563"] { background: linear-gradient(135deg, #8b95a1 0%, #6b7684 100%) !important; box-shadow: 0 4px 12px rgba(139, 149, 161, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.2) !important; }
+button[style*="--primary-color"] { background: var(--primary-grad) !important; box-shadow: 0 4px 12px rgba(49, 130, 246, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important; }
+
 /* JS 인라인 스타일 오버라이드 (SaaS 톤 통일) */
 [style*="color: #666"], [style*="color:#666"] { color: var(--text-muted) !important; }
 [style*="border: 1px solid #ddd"] { border-color: var(--border-color) !important; }
 
 /* 다크 모드 (Dark Mode) 스타일 */
 body.dark-mode {
-    --bg-color: #0b0d0f;
+    --bg-grad: linear-gradient(135deg, #0b0d0f 0%, #15191e 100%);
     --card-bg: #191f28;
     --border-color: #2b323c;
     --light-gray: #242a32;
@@ -251,6 +258,13 @@ body.dark-mode {
     --text-color: #f8fafc;
     --text-muted: #cbd5e1;
 }
+body.dark-mode .card { box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05); }
+body.dark-mode .status > div { background: linear-gradient(145deg, #2a313b 0%, #191f28 100%); border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05); }
+body.dark-mode .calendar-day:not(.other-month):hover { background: linear-gradient(135deg, #2b323c 0%, #1f2630 100%); }
+body.dark-mode .calendar-day.selected { background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); color: #bae6fd; box-shadow: 0 2px 8px rgba(30, 58, 138, 0.4); }
+body.dark-mode .admin-leave-tag.full { background: linear-gradient(135deg, #075985 0%, #0c4a6e 100%); color: #e0f2fe; }
+body.dark-mode .admin-leave-tag.half-am { background: linear-gradient(135deg, #78350f 0%, #451a03 100%); color: #fef3c7; }
+body.dark-mode .admin-leave-tag.half-pm { background: linear-gradient(135deg, #4c1d95 0%, #2e1065 100%); color: #f3e8ff; }
 body.dark-mode h2, body.dark-mode h3, body.dark-mode h4, body.dark-mode .modal-content p { color: #f8fafc; }
 body.dark-mode .modal-overlay { background: rgba(15,23,42,0.8); backdrop-filter: blur(4px); }
 
