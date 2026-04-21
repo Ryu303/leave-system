@@ -1,9 +1,14 @@
 :root {
-    --primary-color: #4f46e5;
-    --primary-hover: #4338ca;
-    --secondary-color: #10b981;
-    --danger-color: #ef4444;
-    --bg-color: #f8fafc;
+    /* 화사하고 입체감 있는 앱 감성 그라데이션 컬러표 */
+    --primary-color: #3182f6;
+    --primary-grad: linear-gradient(135deg, #4aa0ff 0%, #1b64da 100%);
+    --primary-hover: linear-gradient(135deg, #3b8cf5 0%, #1455c0 100%);
+    --secondary-color: #04c09e;
+    --secondary-grad: linear-gradient(135deg, #1be0c0 0%, #039e82 100%);
+    --danger-color: #f04452;
+    --danger-grad: linear-gradient(135deg, #ff6b77 0%, #d82d3b 100%);
+    --bg-color: #e0e7ff;
+    --bg-grad: linear-gradient(135deg, #e0e7ff 0%, #e0f2fe 50%, #f3e8ff 100%);
     --card-bg: #ffffff;
     --border-color: #e2e8f0;
     --light-gray: #f1f5f9;
@@ -58,17 +63,18 @@ button {
     width: 100%;
     padding: 12px 16px;
     margin: 8px 0;
-    border-radius: 8px;
-    background: var(--primary-color);
+    border-radius: 12px;
+    background: var(--primary-grad);
     color: white;
     border: none;
     cursor: pointer;
-    font-weight: 600;
-    font-size: 15px;
+    font-weight: 700;
+    font-size: 16px;
+    box-sizing: border-box;
     transition: all 0.2s ease;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    box-shadow: 0 4px 12px rgba(49, 130, 246, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3);
 }
-.button:hover, button:hover { background: var(--primary-hover); transform: translateY(-1px); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+button:hover { background: var(--primary-hover); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(49, 130, 246, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.4); }
 button:active { transform: translateY(0); }
 .dark-mode-toggle {
     position: fixed; top: 20px; right: 20px; width: 45px; height: 45px; padding: 0;
@@ -107,15 +113,16 @@ button:active { transform: translateY(0); }
 }
 .history-item:hover { background-color: var(--light-gray); border-radius: 6px; }
 .delete-btn {
-    background: var(--danger-color);
+    background: var(--danger-grad);
     color: white;
     border: none;
     border-radius: 5px;
-    padding: 4px 8px;
-    font-size: 12px;
+    padding: 6px 10px;
+    font-size: 13px;
     cursor: pointer;
     width: auto;
     margin: 0;
+    box-shadow: 0 2px 6px rgba(240, 68, 82, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3);
 }
 .admin-toggle {
     display: block;
@@ -230,11 +237,13 @@ button:active { transform: translateY(0); }
     justify-content: center;
 }
 .cancel-btn {
-    background: var(--light-gray);
-    color: var(--text-color);
+    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+    color: #475569;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05), inset 0 1px 1px rgba(255,255,255,0.8);
 }
 .cancel-btn:hover {
-    background: var(--border-color);
+    background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+    color: #1e293b;
 }
 #modalInput {
     margin-bottom: 20px;
@@ -269,6 +278,8 @@ body.dark-mode .admin-leave-tag.half-am { background: linear-gradient(135deg, #7
 body.dark-mode .admin-leave-tag.half-pm { background: linear-gradient(135deg, #4c1d95 0%, #2e1065 100%); color: #f3e8ff; }
 body.dark-mode h2, body.dark-mode h3, body.dark-mode h4, body.dark-mode .modal-content p { color: #f8fafc; }
 body.dark-mode .modal-overlay { background: rgba(15,23,42,0.8); backdrop-filter: blur(4px); }
+body.dark-mode .cancel-btn { background: linear-gradient(135deg, #334155 0%, #1e293b 100%); color: #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.1); }
+body.dark-mode .cancel-btn:hover { background: linear-gradient(135deg, #475569 0%, #334155 100%); }
 
 /* 반응형 (모바일) 스타일 */
 @media (max-width: 600px) {
