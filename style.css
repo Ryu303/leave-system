@@ -227,10 +227,11 @@ button:active { transform: translateY(0); }
     justify-content: center;
 }
 .cancel-btn {
-    background: var(--dark-gray);
+    background: var(--light-gray);
+    color: var(--text-color);
 }
 .cancel-btn:hover {
-    background: #374151;
+    background: var(--border-color);
 }
 #modalInput {
     margin-bottom: 20px;
@@ -242,30 +243,34 @@ button:active { transform: translateY(0); }
 
 /* 다크 모드 (Dark Mode) 스타일 */
 body.dark-mode {
-    --bg-color: #0f172a;
-    --card-bg: #1e293b;
-    --border-color: #334155;
-    --light-gray: #334155;
+    --bg-color: #0b0d0f;
+    --card-bg: #191f28;
+    --border-color: #2b323c;
+    --light-gray: #242a32;
     --dark-gray: #94a3b8;
     --text-color: #f8fafc;
     --text-muted: #cbd5e1;
 }
+body.dark-mode h2, body.dark-mode h3, body.dark-mode h4, body.dark-mode .modal-content p { color: #f8fafc; }
 body.dark-mode .modal-overlay { background: rgba(15,23,42,0.8); backdrop-filter: blur(4px); }
 
 /* 반응형 (모바일) 스타일 */
 @media (max-width: 600px) {
     body {
-        padding: 16px 10px;
+        padding: 0;
+        background: var(--card-bg); /* 모바일에서는 꽉 차게 */
     }
     .card {
         padding: 24px 20px;
+        border-radius: 0;
+        box-shadow: none;
     }
     .status {
         gap: 12px;
         margin: 20px 0;
     }
     .status > div {
-        padding: 16px 10px;
+        padding: 20px 10px;
     }
     .status strong { font-size: 24px; }
     .calendar-day { padding: 8px 0; font-size: 13px; }
