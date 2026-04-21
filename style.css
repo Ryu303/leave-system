@@ -316,18 +316,40 @@ button:active { transform: translateY(0); }
 
 /* 다크 모드 (Dark Mode) 스타일 */
 body.dark-mode {
-    --bg-color: #0b0d0f;
-    --card-bg: #191f28;
+    --primary-color: #60a5fa;
+    --primary-grad: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+    --primary-hover: linear-gradient(135deg, #60a5fa 0%, #2563eb 100%);
+    --secondary-color: #34d399;
+    --secondary-grad: linear-gradient(135deg, #10b981 0%, #047857 100%);
+    --danger-color: #f87171;
+    --danger-grad: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+    --bg-color: #020617;
+    --bg-grad: linear-gradient(135deg, #020617 0%, #0f172a 50%, #1e1b4b 100%);
+    --card-bg: #1e293b;
     --border-color: #334155;
-    --light-gray: #334155;
+    --light-gray: #0f172a;
     --dark-gray: #94a3b8;
     --text-color: #f8fafc;
     --text-muted: #cbd5e1;
 }
+body.dark-mode .card { background: rgba(30, 41, 59, 0.85); backdrop-filter: blur(12px); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.05); }
+body.dark-mode .status > div { background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%); border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05); }
+body.dark-mode .calendar-day:not(.other-month):hover { background: linear-gradient(135deg, #334155 0%, #1e293b 100%); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); }
+body.dark-mode .calendar-day.selected { background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); color: #bae6fd; box-shadow: 0 2px 8px rgba(30, 58, 138, 0.4); }
+body.dark-mode .admin-leave-tag.full { background: linear-gradient(135deg, #075985 0%, #0c4a6e 100%); color: #e0f2fe; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); }
+body.dark-mode .admin-leave-tag.half-am { background: linear-gradient(135deg, #78350f 0%, #451a03 100%); color: #fef3c7; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); }
+body.dark-mode .admin-leave-tag.half-pm { background: linear-gradient(135deg, #4c1d95 0%, #2e1065 100%); color: #f3e8ff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); }
 body.dark-mode h2, body.dark-mode h3, body.dark-mode h4, body.dark-mode .modal-content p { color: #f8fafc; }
-body.dark-mode .checkbox-label { color: #d1d5db; background: #374151; border-color: #4b5563; }
-body.dark-mode .status strong { color: #f8fafc; }
-body.dark-mode .modal-overlay { background: rgba(15,23,42,0.8); backdrop-filter: blur(4px); }
+body.dark-mode .checkbox-label { color: #f8fafc; background: #1e293b; border-color: #334155; }
+body.dark-mode .checkbox-label:hover { border-color: #475569; }
+body.dark-mode .status strong { color: #60a5fa; }
+body.dark-mode .modal-overlay { background: rgba(2, 6, 23, 0.8); backdrop-filter: blur(6px); }
+body.dark-mode .cancel-btn { background: linear-gradient(135deg, #334155 0%, #1e293b 100%); color: #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.1); }
+body.dark-mode .cancel-btn:hover { background: linear-gradient(135deg, #475569 0%, #334155 100%); }
+body.dark-mode .history-item { border-bottom-color: #334155; }
+body.dark-mode .history-item:hover { background-color: #1e293b; }
+body.dark-mode .admin-calendar-day { border-color: #334155; background: rgba(30, 41, 59, 0.4); }
+body.dark-mode hr { border-top-color: #334155 !important; }
 
 /* 반응형 (모바일) 스타일 */
 @media (max-width: 600px) {
