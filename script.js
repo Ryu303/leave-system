@@ -327,18 +327,35 @@ function applyLeave() {
 
 // 연차 취소(삭제)
 async function deleteLeave(leaveId) {
-    const confirmed = await openModal('이 기록을 삭제하시겠습니까?', 'confirm');
-    if (!confirmed) return;
-
     const user = db[currentName];
     if (!user.history) user.history = []; // Firebase 빈 배열 삭제 대응
     const recordIndex = user.history.findIndex(h => h.id === leaveId);
     
     if (recordIndex > -1) {
         const record = user.history[recordIndex];
-        if (record.status !== 'rejected') {
-            user.used -= record.type; // 반려 상태가 아니라면 차감된 연차 복구
+
+        if (record.status === 'approved' || record.status === 'cancel_rejected') {
+            const confirmed = await openModal('이미 승인된 연차입니다.\n관리자에게 취소를 요청하시겠습니까?', 'confirm');
+            if (!confirmed) return;
+            const reason = await openModal('취소 사유를 입력하세요:', 'prompt');
+            if (reason === null) return;
+
+            record.status = 'cancel_requested';
+            record.cancelReason = reason.trim();
+            saveDB();
+            return showModal('취소 요청이 전송되었습니다.');
+        } else if (record.status === 'cancel_requested') {
+            return showModal('이미 취소 요청이 진행 중입니다.');
         }
+
+        const confirmed = await openModal('이 기록을 삭제하시겠습니까?', 'confirm');
+        if (!confirmed) return;
+
+        if (record.status === 'pending') {
+            user.used -= record.type; // 대기 중인 상태면 차감된 연차 복구
+        }
+        // 반려(rejected)나 취소완료(canceled) 상태는 이미 복구되었으므로 기록만 삭제
+        
         user.history.splice(recordIndex, 1);
         saveDB();
     }
@@ -384,8 +401,13 @@ function updateUI() {
     let needsSave = false;
     let combinedMsg = ''; // 여러 알림이 있을 경우를 위해 합침
     user.history.forEach(h => {
-        if ((h.status === 'approved' || h.status === 'rejected') && !h.notified) {
-            const statusMsg = h.status === 'approved' ? '승인' : '반려';
+        if (['approved', 'rejected', 'canceled', 'cancel_rejected'].includes(h.status) && !h.notified) {
+            let statusMsg = '';
+            if (h.status === 'approved') statusMsg = '승인';
+            else if (h.status === 'rejected') statusMsg = '반려';
+            else if (h.status === 'canceled') statusMsg = '취소 승인';
+            else if (h.status === 'cancel_rejected') statusMsg = '취소 반려';
+
             const typeStr = h.type == 1 ? '연차' : (h.subType === '0.5pm' ? '오후 반차' : (h.subType === '0.5am' ? '오전 반차' : '반차'));
             combinedMsg += `[알림] ${h.date} (${typeStr}) 신청이 ${statusMsg}되었습니다.\n`;
             if (h.reason) {
@@ -428,19 +450,31 @@ function updateUI() {
             } else if (h.status === 'approved') {
                 statusText = '승인 완료';
                 statusColor = 'green';
+            } else if (h.status === 'cancel_requested') {
+                statusText = '취소 요청 중';
+                statusColor = 'purple';
+            } else if (h.status === 'canceled') {
+                statusText = '취소 완료';
+                statusColor = 'gray';
+            } else if (h.status === 'cancel_rejected') {
+                statusText = '승인 유지 (취소 반려)';
+                statusColor = 'green';
             }
 
             const item = document.createElement('div');
             item.className = 'history-item';
             item.style.alignItems = 'flex-start'; // 사유가 추가되어 여러 줄이 될 수 있으므로 위쪽 정렬
             const typeStr = h.type == 1 ? '연차' : (h.subType === '0.5pm' ? '오후 반차' : (h.subType === '0.5am' ? '오전 반차' : '반차'));
+            const btnText = (h.status === 'approved' || h.status === 'cancel_rejected') ? '취소' : '삭제';
+            const btnDisplay = h.status === 'cancel_requested' ? 'none' : 'block';
             item.innerHTML = `
                 <div>
                     <span>${h.date} - <strong>${typeStr}</strong> 
                     <span style="color:${statusColor}; font-size: 0.8em; margin-left: 5px;">[${statusText}]</span></span>
                     ${h.reason ? `<div style="font-size: 0.85em; color: #666; margin-top: 5px;">사유: ${h.reason}</div>` : ''}
+                    ${h.cancelReason ? `<div style="font-size: 0.85em; color: purple; margin-top: 5px;">취소 사유: ${h.cancelReason}</div>` : ''}
                 </div>
-                <button class="delete-btn" onclick="deleteLeave('${h.id}')">삭제</button>
+                <button class="delete-btn" style="display: ${btnDisplay};" onclick="deleteLeave('${h.id}')">${btnText}</button>
             `;
             historyContainer.appendChild(item);
         });
@@ -517,7 +551,7 @@ async function showAdminView() {
     pendingHeader.style.justifyContent = 'space-between';
     pendingHeader.style.alignItems = 'center';
     pendingHeader.style.marginTop = '30px';
-    pendingHeader.innerHTML = '<h3 style="margin: 0;">승인 대기 중인 신청</h3>';
+    pendingHeader.innerHTML = '<h3 style="margin: 0;">대기 중인 요청 (신청 / 취소)</h3>';
     
     const pendingList = document.createElement('div');
     let hasPending = false;
@@ -527,7 +561,7 @@ async function showAdminView() {
         if (!u.history) return;
         
         u.history.forEach(h => {
-            if (h.status === 'pending') {
+            if (h.status === 'pending' || h.status === 'cancel_requested') {
                 hasPending = true;
                 const item = document.createElement('div');
                 item.className = 'pending-item';
@@ -535,11 +569,21 @@ async function showAdminView() {
                 item.style.padding = '10px';
                 item.style.marginTop = '10px';
                 const typeStr = h.type == 1 ? '연차' : (h.subType === '0.5pm' ? '오후 반차' : (h.subType === '0.5am' ? '오전 반차' : '반차'));
-                item.innerHTML = `
-                    <div style="margin-bottom: 5px;"><strong>${name}</strong> - ${h.date} (${typeStr})</div>
-                    <button class="btn-success btn-sm" onclick="approveLeave('${name}', '${h.id}')">승인</button>
-                    <button class="btn-danger btn-sm" onclick="rejectLeave('${name}', '${h.id}')">반려</button>
-                `;
+                
+                if (h.status === 'pending') {
+                    item.innerHTML = `
+                        <div style="margin-bottom: 5px;"><strong>${name}</strong> - ${h.date} (${typeStr})</div>
+                        <button class="btn-success btn-sm" onclick="approveLeave('${name}', '${h.id}')">승인</button>
+                        <button class="btn-danger btn-sm" onclick="rejectLeave('${name}', '${h.id}')">반려</button>
+                    `;
+                } else { // cancel_requested
+                    item.innerHTML = `
+                        <div style="margin-bottom: 5px;"><strong>${name}</strong> - ${h.date} (${typeStr}) <span style="color: purple; font-weight: bold; font-size: 0.9em;">[취소 요청]</span></div>
+                        <div style="font-size: 0.85em; color: #666; margin-bottom: 8px;">사유: ${h.cancelReason || '없음'}</div>
+                        <button class="btn-gray btn-sm" onclick="approveCancel('${name}', '${h.id}')">취소 승인</button>
+                        <button class="btn-danger btn-sm" onclick="rejectCancel('${name}', '${h.id}')">취소 반려</button>
+                    `;
+                }
                 pendingList.appendChild(item);
             }
         });
@@ -621,6 +665,75 @@ async function rejectLeave(userName, leaveId) {
         user.used -= record.type; // 반려 시 차감되었던 연차 복구
         saveDB();
     }
+}
+
+// 관리자: 연차 취소 승인
+async function approveCancel(userName, leaveId) {
+    const user = db[userName];
+    if (!user || !user.history) return;
+    const record = user.history.find(h => h.id === leaveId);
+    if (record) {
+        const confirmed = await openModal('해당 연차의 취소를 승인하시겠습니까?', 'confirm');
+        if (!confirmed) return;
+
+        record.status = 'canceled';
+        record.notified = false; // 알림 띄우기
+        user.used -= record.type; // 차감되었던 연차 복구
+        saveDB();
+        showAdminView();
+    }
+}
+
+// 관리자: 연차 취소 반려
+async function rejectCancel(userName, leaveId) {
+    const user = db[userName];
+    if (!user || !user.history) return;
+    const record = user.history.find(h => h.id === leaveId);
+    if (record) {
+        const reason = await openModal('취소 반려 사유를 입력하세요 (선택사항):', 'prompt');
+        if (reason === null) return; // '취소' 클릭 시 진행 중단
+
+        record.status = 'cancel_rejected';
+        if (reason.trim() !== '') record.reason = reason.trim();
+        record.notified = false;
+        saveDB();
+        showAdminView();
+    }
+}
+
+// 관리자: 엑셀(CSV) 다운로드
+function downloadCSV() {
+    let csvContent = '\uFEFF'; // 엑셀에서 한글 깨짐 방지 (BOM)
+    csvContent += '이름,전체연차,사용연차,잔여연차,휴가일자,휴가종류,상태,사유,취소사유\n';
+
+    for (let name in db) {
+        const u = db[name];
+        if (!u.total && u.total !== 0) continue; // Skip if user data is incomplete
+        const remain = (u.total - u.used).toFixed(1);
+        
+        if (!u.history || u.history.length === 0) {
+            csvContent += `"${name}","${u.total}","${u.used}","${remain}","","","","",""\n`;
+        } else {
+            const sortedHistory = [...u.history].sort((a, b) => a.date.localeCompare(b.date));
+            sortedHistory.forEach(h => {
+                let typeStr = h.type == 1 ? '연차' : (h.subType === '0.5pm' ? '오후 반차' : (h.subType === '0.5am' ? '오전 반차' : '반차'));
+                let statusStr = h.status === 'approved' ? '승인' : (h.status === 'rejected' ? '반려' : (h.status === 'pending' ? '대기' : (h.status === 'canceled' ? '취소됨' : (h.status === 'cancel_requested' ? '취소요청' : (h.status === 'cancel_rejected' ? '취소반려' : h.status)))));
+                let reasonStr = h.reason ? h.reason.replace(/"/g, '""') : '';
+                let cancelReasonStr = h.cancelReason ? h.cancelReason.replace(/"/g, '""') : '';
+                
+                csvContent += `"${name}","${u.total}","${u.used}","${remain}","${h.date}","${typeStr}","${statusStr}","${reasonStr}","${cancelReasonStr}"\n`;
+            });
+        }
+    }
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `연차사용내역_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 // 관리자: 사용자 비밀번호 초기화

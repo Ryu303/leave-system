@@ -13,11 +13,11 @@
     --border-color: #e2e8f0;
     --light-gray: #f1f5f9;
     --dark-gray: #64748b;
-    --text-color: #0f172a;
-    --text-muted: #64748b;
+    --text-color: #333d4b;
+    --text-muted: #8b95a1;
 }
 body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Segoe UI", Roboto, sans-serif;
     display: flex;
     justify-content: center;
     align-items: flex-start;
@@ -28,36 +28,40 @@ body {
     margin: 0;
     box-sizing: border-box;
     color: var(--text-color);
+    letter-spacing: -0.015em;
     transition: background 0.3s, color 0.3s;
 }
-.container { width: 100%; max-width: 540px; }
+.container { width: 100%; max-width: 480px; } /* 모바일에 더 가까운 너비 */
 .card {
     background: rgba(255, 255, 255, 0.92);
     backdrop-filter: blur(12px);
     padding: 40px;
-    border-radius: 16px;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
-    border: 1px solid var(--border-color);
-    transition: background 0.3s, border-color 0.3s;
+    border-radius: 24px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04), 0 24px 48px rgba(0, 0, 0, 0.03), inset 0 2px 4px rgba(255, 255, 255, 0.5);
+    border: none;
+    transition: background 0.3s;
 }
-hr { border: none; border-top: 1px solid var(--border-color) !important; }
+h2 { margin-top: 0; color: #191f28; font-weight: 700; font-size: 24px; }
+h3, h4 { color: #191f28; font-weight: 700; }
+hr { border: none; border-top: 1px solid var(--border-color) !important; margin: 24px 0; }
 input:not([type="checkbox"]), select {
     width: 100%;
-    padding: 12px 16px;
+    padding: 14px 16px;
     margin: 8px 0 16px;
-    border-radius: 8px;
-    border: 1px solid var(--border-color);
-    background-color: var(--card-bg);
+    border-radius: 12px;
+    border: 1px solid transparent;
+    background-color: var(--light-gray);
     color: var(--text-color);
     box-sizing: border-box;
     font-size: 15px;
+    font-family: inherit;
     transition: all 0.2s ease;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.02);
 }
 input:focus, select:focus {
     outline: none;
+    background-color: var(--card-bg);
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+    box-shadow: 0 0 0 4px rgba(49, 130, 246, 0.15);
 }
 input[type="checkbox"] {
     width: 22px;
@@ -71,17 +75,21 @@ input[type="checkbox"] {
     align-items: center;
     font-size: 15px;
     font-weight: 600;
-    color: var(--text-color);
+    color: #4e5968;
     cursor: pointer;
     margin-bottom: 12px;
     background: var(--light-gray);
     padding: 14px 16px;
     border-radius: 12px;
-    border: 1px solid var(--border-color);
+    border: 1px solid transparent;
+    transition: all 0.2s ease;
+}
+.checkbox-label:hover {
+    border-color: #d1d8e0;
 }
 button {
     width: 100%;
-    padding: 12px 16px;
+    padding: 14px 16px;
     margin: 8px 0;
     border-radius: 12px;
     background: var(--primary-grad);
@@ -90,6 +98,7 @@ button {
     cursor: pointer;
     font-weight: 700;
     font-size: 16px;
+    font-family: inherit;
     box-sizing: border-box;
     white-space: nowrap;
     line-height: 1.5;
@@ -118,8 +127,8 @@ button:active { transform: translateY(0); }
 }
 .dark-mode-toggle {
     position: fixed; top: 20px; right: 20px; width: 45px; height: 45px; padding: 0;
-    border-radius: 50%; background: var(--card-bg); border: 1px solid var(--border-color);
-    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); font-size: 20px; cursor: pointer;
+    border-radius: 50%; background: var(--card-bg); border: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08); font-size: 20px; cursor: pointer;
     z-index: 1000; display: flex; align-items: center; justify-content: center;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); color: var(--text-color);
 }
@@ -127,22 +136,22 @@ button:active { transform: translateY(0); }
 .status {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
+    gap: 12px;
     text-align: center;
     margin: 24px 0;
 }
 .status > div {
-    background: var(--card-bg);
-    padding: 20px 15px;
-    border-radius: 12px;
-    border: 1px solid var(--border-color);
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+    background: linear-gradient(145deg, #ffffff 0%, #f2f4f6 100%);
+    padding: 24px 15px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03), inset 0 2px 4px rgba(255, 255, 255, 0.6);
     color: var(--text-muted);
     font-size: 14px;
-    font-weight: 500;
+    font-weight: 600;
 }
-.status strong { font-size: 28px; color: var(--primary-color); display: block; margin-top: 8px; font-weight: 700; }
-.history { margin-top: 24px; font-size: 14px; border-top: 1px solid var(--border-color); padding-top: 16px; }
+.status strong { font-size: 32px; color: var(--text-color); display: block; margin-top: 8px; font-weight: 800; letter-spacing: -0.02em; }
+.history { margin-top: 24px; font-size: 15px; border-top: 1px solid var(--border-color); padding-top: 16px; }
 .history-item {
     display: flex;
     justify-content: space-between;
@@ -151,7 +160,7 @@ button:active { transform: translateY(0); }
     border-bottom: 1px solid var(--border-color);
     transition: background-color 0.2s;
 }
-.history-item:hover { background-color: var(--light-gray); border-radius: 6px; }
+.history-item:hover { background-color: var(--light-gray); border-radius: 12px; border-color: transparent; }
 .delete-btn {
     background: var(--danger-grad);
     color: white;
@@ -168,41 +177,42 @@ button:active { transform: translateY(0); }
     display: block;
     text-align: center;
     margin-top: 20px;
-    color: var(--primary-color);
+    color: var(--text-muted);
     cursor: pointer;
-    font-weight: 500;
+    font-weight: 600;
     text-decoration: none;
     transition: color 0.2s;
 }
-.admin-toggle:hover { color: var(--primary-hover); text-decoration: underline; }
+.admin-toggle:hover { color: var(--text-color); }
 #adminView { display: none; }
 .user-list-item {
     display: flex;
     justify-content: space-between;
-    padding: 16px;
-    background: var(--card-bg);
+    padding: 20px;
+    background: var(--light-gray);
     border: 1px solid var(--border-color);
-    box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
-    border-radius: 10px;
-    margin-bottom: 10px;
+    border: none;
+    border-radius: 16px;
+    margin-bottom: 12px;
     transition: transform 0.2s;
 }
-.user-list-item:hover { transform: translateY(-2px); box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+.user-list-item:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
 /* Calendar Styles */
 #calendarContainer { margin-top: 30px; }
 .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-.calendar-header button { width: auto; padding: 5px 15px; margin: 0; }
+.calendar-header button { width: auto; padding: 8px 16px; margin: 0; background: var(--light-gray); color: var(--text-color); border-radius: 8px;}
+.calendar-header button:hover { background: var(--border-color); }
 #calendarGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; }
 .calendar-day-name { font-weight: 600; font-size: 12px; color: var(--text-muted); padding-bottom: 5px;}
-.calendar-day { padding: 10px 0; border-radius: 8px; position: relative; font-size: 14px;}
+.calendar-day { padding: 10px 0; border-radius: 12px; position: relative; font-size: 15px; font-weight: 500;}
 .calendar-day.other-month { color: #ccc; }
 .calendar-day:not(.other-month) { cursor: pointer; transition: background-color 0.2s; }
-.calendar-day:not(.other-month):hover { background-color: var(--light-gray); }
-.calendar-day.selected { background-color: var(--light-gray); border: 1px solid var(--primary-color); }
+.calendar-day:not(.other-month):hover { background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04); }
+.calendar-day.selected { background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); color: #0284c7; font-weight: 700; box-shadow: 0 2px 8px rgba(2, 132, 199, 0.15); border: none; }
 .calendar-day.has-leave::after {
     content: '';
     position: absolute;
-    bottom: 2px;
+    bottom: 4px;
     left: 50%;
     transform: translateX(-50%);
     width: 6px;
@@ -212,34 +222,46 @@ button:active { transform: translateY(0); }
     box-shadow: 0 2px 4px rgba(4, 192, 158, 0.4);
 }
 .calendar-day.has-half-am-leave::after {
-    content: ''; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
+    content: ''; position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
     width: 6px; height: 6px; border-radius: 50%; background: linear-gradient(135deg, #fbb832 0%, #e68d00 100%); box-shadow: 0 2px 4px rgba(245, 158, 11, 0.4);
 }
 .calendar-day.has-half-pm-leave::after {
-    content: ''; position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%);
+    content: ''; position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
     width: 6px; height: 6px; border-radius: 50%; background: linear-gradient(135deg, #9b72f8 0%, #7038e8 100%); box-shadow: 0 2px 4px rgba(139, 92, 246, 0.4);
 }
 
 /* Admin Calendar Styles (관리자용 달력) */
 #adminCalendarGrid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; }
 .admin-calendar-day-name { font-weight: 600; font-size: 12px; color: var(--text-muted); padding-bottom: 5px;}
-.admin-calendar-day { padding: 5px 2px; border-radius: 6px; border: 1px solid var(--border-color); min-height: 55px; display: flex; flex-direction: column; align-items: center; font-size: 12px; background: var(--card-bg);}
+.admin-calendar-day { padding: 8px 2px; border-radius: 12px; border: 1px solid var(--border-color); min-height: 60px; display: flex; flex-direction: column; align-items: center; font-size: 13px; background: var(--card-bg); font-weight: 500;}
 .admin-leave-tag {
-    font-size: 10px;
-    color: white;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--primary-color);
+    background-color: #e0e7ff;
     border-radius: 4px;
-    padding: 2px 4px;
-    margin-top: 2px;
+    padding: 3px 6px;
+    margin-top: 4px;
     width: 90%;
     text-align: center;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
-.admin-leave-tag.full { background-color: var(--secondary-color); }
-.admin-leave-tag.half-am { background-color: #f59e0b; }
-.admin-leave-tag.half-pm { background-color: #8b5cf6; }
+.admin-leave-tag.full { background: linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%); color: #0369a1; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.05); }
+.admin-leave-tag.half-am { background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); color: #92400e; box-shadow: 0 2px 4px rgba(217, 119, 6, 0.05); }
+.admin-leave-tag.half-pm { background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%); color: #5b21b6; box-shadow: 0 2px 4px rgba(109, 40, 217, 0.05); }
 .admin-leave-tag.pending { opacity: 0.6; }
+
+.pending-item button {
+    width: auto !important;
+    display: inline-block;
+    padding: 8px 14px !important;
+    margin-top: 8px;
+    margin-right: 6px;
+    border-radius: 8px !important;
+    font-size: 13px !important;
+}
 
 /* 커스텀 모달 (팝업) 스타일 */
 .modal-overlay {
@@ -250,21 +272,22 @@ button:active { transform: translateY(0); }
     justify-content: center;
     align-items: center;
     z-index: 1000;
-    backdrop-filter: blur(3px);
+    backdrop-filter: blur(5px);
 }
 .modal-content {
     background: var(--card-bg);
     padding: 30px 25px;
-    border-radius: 16px;
+    border-radius: 24px;
     width: 90%;
-    max-width: 360px;
+    max-width: 340px;
     text-align: center;
-    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
-    border: 1px solid var(--border-color);
+    box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1);
+    border: none;
 }
 .modal-content p {
     margin-top: 0; margin-bottom: 20px;
-    color: var(--text-color);
+    color: #191f28;
+    font-weight: 600;
     line-height: 1.5;
     white-space: pre-wrap; /* 줄바꿈 유지 */
 }
@@ -277,13 +300,11 @@ button:active { transform: translateY(0); }
     justify-content: center;
 }
 .cancel-btn {
-    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
-    color: #475569;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05), inset 0 1px 1px rgba(255,255,255,0.8);
+    background: var(--light-gray);
+    color: var(--text-color);
 }
 .cancel-btn:hover {
-    background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
-    color: #1e293b;
+    background: var(--border-color);
 }
 #modalInput {
     margin-bottom: 20px;
@@ -295,30 +316,24 @@ button:active { transform: translateY(0); }
 
 /* 다크 모드 (Dark Mode) 스타일 */
 body.dark-mode {
-    --bg-grad: linear-gradient(135deg, #020617 0%, #0f172a 50%, #1e1b4b 100%);
+    --bg-color: #0b0d0f;
     --card-bg: #191f28;
-    --border-color: #2b323c;
-    --light-gray: #242a32;
+    --border-color: #334155;
+    --light-gray: #334155;
     --dark-gray: #94a3b8;
     --text-color: #f8fafc;
     --text-muted: #cbd5e1;
 }
-body.dark-mode .card { background: rgba(25, 31, 40, 0.85); backdrop-filter: blur(12px); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05); }
-body.dark-mode .status > div { background: linear-gradient(145deg, #2a313b 0%, #191f28 100%); border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05); }
-body.dark-mode .calendar-day:not(.other-month):hover { background: linear-gradient(135deg, #2b323c 0%, #1f2630 100%); }
-body.dark-mode .calendar-day.selected { background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); color: #bae6fd; box-shadow: 0 2px 8px rgba(30, 58, 138, 0.4); }
-body.dark-mode .admin-leave-tag.full { background: linear-gradient(135deg, #075985 0%, #0c4a6e 100%); color: #e0f2fe; }
-body.dark-mode .admin-leave-tag.half-am { background: linear-gradient(135deg, #78350f 0%, #451a03 100%); color: #fef3c7; }
-body.dark-mode .admin-leave-tag.half-pm { background: linear-gradient(135deg, #4c1d95 0%, #2e1065 100%); color: #f3e8ff; }
 body.dark-mode h2, body.dark-mode h3, body.dark-mode h4, body.dark-mode .modal-content p { color: #f8fafc; }
+body.dark-mode .checkbox-label { color: #d1d5db; background: #374151; border-color: #4b5563; }
+body.dark-mode .status strong { color: #f8fafc; }
 body.dark-mode .modal-overlay { background: rgba(15,23,42,0.8); backdrop-filter: blur(4px); }
-body.dark-mode .cancel-btn { background: linear-gradient(135deg, #334155 0%, #1e293b 100%); color: #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.1); }
-body.dark-mode .cancel-btn:hover { background: linear-gradient(135deg, #475569 0%, #334155 100%); }
 
 /* 반응형 (모바일) 스타일 */
 @media (max-width: 600px) {
     body {
         padding: 0;
+        background: var(--card-bg); /* 모바일에서는 꽉 차게 */
     }
     .card {
         padding: 24px 20px;
