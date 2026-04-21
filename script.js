@@ -345,8 +345,34 @@ async function deleteLeave(leaveId) {
 }
 
 // 달력 날짜 클릭 시 인풋에 값 넣기
-function selectDateFromCalendar(dateString) {
-    document.getElementById('startDate').value = dateString;
+function selectDateFromCalendar(dateString, dayEl) {
+    const isRange = document.getElementById('isRange').checked;
+    const startInput = document.getElementById('startDate');
+    const endInput = document.getElementById('endDate');
+
+    if (!isRange) {
+        startInput.value = dateString;
+        document.querySelectorAll('.calendar-day').forEach(el => el.classList.remove('selected'));
+        if (dayEl) dayEl.classList.add('selected');
+    } else {
+        if (!startInput.value || (startInput.value && endInput.value)) {
+            // 시작일 설정 (새로 시작)
+            startInput.value = dateString;
+            endInput.value = '';
+            document.querySelectorAll('.calendar-day').forEach(el => el.classList.remove('selected'));
+            if (dayEl) dayEl.classList.add('selected');
+        } else {
+            // 종료일 설정 (또는 클릭한 날짜가 더 앞이면 시작일 갱신)
+            if (dateString < startInput.value) {
+                startInput.value = dateString;
+                document.querySelectorAll('.calendar-day').forEach(el => el.classList.remove('selected'));
+                if (dayEl) dayEl.classList.add('selected');
+            } else {
+                endInput.value = dateString;
+                if (dayEl) dayEl.classList.add('selected'); // 시작일과 종료일 둘 다 파랗게 표시
+            }
+        }
+    }
 }
 
 // 화면 업데이트 로직
@@ -667,10 +693,7 @@ function renderCalendar(year, month, history) {
         const currentDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         
         dayEl.onclick = () => {
-            selectDateFromCalendar(currentDateStr);
-            // 시각적 피드백
-            document.querySelectorAll('.calendar-day').forEach(el => el.classList.remove('selected'));
-            dayEl.classList.add('selected');
+            selectDateFromCalendar(currentDateStr, dayEl);
         };
 
         // 해당 날짜에 연차 기록이 있는지 확인
