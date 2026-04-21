@@ -18,6 +18,7 @@ body {
     align-items: flex-start;
     padding: 40px 20px;
     background: var(--bg-grad);
+    background-attachment: fixed;
     min-height: 100vh;
     margin: 0;
     box-sizing: border-box;
@@ -26,7 +27,8 @@ body {
 }
 .container { width: 100%; max-width: 540px; }
 .card {
-    background: var(--card-bg);
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(12px);
     padding: 40px;
     border-radius: 16px;
     box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
@@ -250,7 +252,7 @@ button[style*="--primary-color"] { background: var(--primary-grad) !important; b
 
 /* 다크 모드 (Dark Mode) 스타일 */
 body.dark-mode {
-    --bg-grad: linear-gradient(135deg, #0b0d0f 0%, #15191e 100%);
+    --bg-grad: linear-gradient(135deg, #020617 0%, #0f172a 50%, #1e1b4b 100%);
     --card-bg: #191f28;
     --border-color: #2b323c;
     --light-gray: #242a32;
@@ -258,7 +260,7 @@ body.dark-mode {
     --text-color: #f8fafc;
     --text-muted: #cbd5e1;
 }
-body.dark-mode .card { box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05); }
+body.dark-mode .card { background: rgba(25, 31, 40, 0.85); backdrop-filter: blur(12px); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05); }
 body.dark-mode .status > div { background: linear-gradient(145deg, #2a313b 0%, #191f28 100%); border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05); }
 body.dark-mode .calendar-day:not(.other-month):hover { background: linear-gradient(135deg, #2b323c 0%, #1f2630 100%); }
 body.dark-mode .calendar-day.selected { background: linear-gradient(135deg, #1e3a8a 0%, #1e40af 100%); color: #bae6fd; box-shadow: 0 2px 8px rgba(30, 58, 138, 0.4); }
@@ -272,7 +274,6 @@ body.dark-mode .modal-overlay { background: rgba(15,23,42,0.8); backdrop-filter:
 @media (max-width: 600px) {
     body {
         padding: 0;
-        background: var(--card-bg); /* 모바일에서는 꽉 차게 */
     }
     .card {
         padding: 24px 20px;

@@ -3,6 +3,7 @@ let db = {};
 let currentName = '';
 let calendarDate = new Date();
 let adminCalendarDate = new Date(); // 관리자 달력용 날짜 상태
+let lastAdminNotificationCount = -1; // 관리자 알림 카운트
 
 // --- 다크 모드 (Dark Mode) ---
 if (localStorage.getItem('darkMode') === 'true') {
@@ -139,6 +140,7 @@ function logout() {
     sessionStorage.removeItem('currentView');
     sessionStorage.removeItem('currentUser');
     currentName = '';
+    lastAdminNotificationCount = -1; // 로그아웃 시 알림 카운트 초기화
     
     document.getElementById('info').style.display = 'none';
     document.getElementById('adminView').style.display = 'none';
@@ -444,6 +446,25 @@ async function showAdminView() {
         userListContainer.innerHTML = '<p style="text-align:center; color:#666;">등록된 팀원이 없습니다.</p>';
         return;
     }
+
+    // 관리자 알림 로직 (신규 신청 건수 확인)
+    let currentPendingCount = 0;
+    users.forEach(name => {
+        if (db[name].history) {
+            db[name].history.forEach(h => {
+                if (h.status === 'pending') {
+                    currentPendingCount++;
+                }
+            });
+        }
+    });
+
+    if (lastAdminNotificationCount === -1 && currentPendingCount > 0) {
+        showModal(`현재 처리해야 할 대기 요청이 ${currentPendingCount}건 있습니다.`);
+    } else if (lastAdminNotificationCount !== -1 && currentPendingCount > lastAdminNotificationCount) {
+        showModal(`새로운 결재 요청이 들어왔습니다!\n(현재 총 ${currentPendingCount}건 대기 중)`);
+    }
+    lastAdminNotificationCount = currentPendingCount;
 
     users.forEach(name => {
         const u = db[name];
