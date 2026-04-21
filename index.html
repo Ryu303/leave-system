@@ -24,7 +24,7 @@
                 <p>이름과 비밀번호를 입력하여 로그인하세요.</p>
                 <input type="text" id="nameInput" placeholder="이름 (예: 류재진)">
                 <input type="password" id="loginPasswordInput" placeholder="비밀번호">
-                <button onclick="fetchUser()">로그인</button>
+                <button class="btn-primary" onclick="fetchUser()">로그인</button>
                 <a class="admin-toggle" onclick="showAdminView()">👑 관리자 페이지 접속</a>
             </div>
 
@@ -33,15 +33,15 @@
                 <p><strong id="newUserName" style="color: var(--primary-color);"></strong>님을 등록합니다.<br>초기 연차 개수를 입력해주세요.</p>
                 <input type="number" id="initialLeaveInput" placeholder="초기 연차 개수 (예: 15)" value="15">
                 <input type="password" id="registerPasswordInput" placeholder="비밀번호 재확인" readonly style="background-color: #f3f4f6; color: #6b7280; outline: none;">
-                <button onclick="registerUser()" style="background:var(--secondary-color);">등록하기</button>
-                <a class="admin-toggle" onclick="logout()" style="margin-top: 15px;">⬅ 뒤로가기 (취소)</a>
+                <button class="btn-secondary" onclick="registerUser()">등록하기</button>
+                <a class="admin-toggle" onclick="logout()">⬅ 뒤로가기 (취소)</a>
             </div>
 
             <div id="info" style="display:none;">
                 <div style="text-align: right; margin-bottom: 15px;">
                     <strong id="loggedInUserName" style="color: var(--primary-color);"></strong>님 환영합니다. 
-                    <button onclick="changeMyPassword()" style="width: auto; padding: 5px 12px; margin-left: 10px; background: var(--primary-color); font-size: 12px; border-radius: 6px;">비밀번호 변경</button>
-                    <button onclick="logout()" style="width: auto; padding: 5px 12px; margin-left: 5px; background: var(--dark-gray); font-size: 12px; border-radius: 6px;">로그아웃</button>
+                    <button class="btn-primary btn-sm" onclick="changeMyPassword()">비밀번호 변경</button>
+                    <button class="btn-gray btn-sm" onclick="logout()">로그아웃</button>
                 </div>
                 <div class="status">
                     <div>남은 연차<strong id="remain">0</strong></div>
@@ -51,11 +51,9 @@
                 <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
                 
                 <h4>연차 신청</h4>
-                <div style="margin-bottom: 10px; text-align: left;">
-                    <label style="font-size: 14px; cursor: pointer; color: var(--text-color);">
-                        <input type="checkbox" id="isRange" onchange="toggleRangeInput()"> 🗓 여러 날짜(기간) 한 번에 신청
-                    </label>
-                </div>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="isRange" onchange="toggleRangeInput()"> 🗓 여러 날짜(기간) 한 번에 신청
+                </label>
                 <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
                     <input type="date" id="startDate" style="margin: 0; flex: 1;">
                     <span id="rangeTilde" style="display: none; font-weight: bold;">~</span>
@@ -66,7 +64,7 @@
                     <option value="0.5am">오전 반차 (0.5일)</option>
                     <option value="0.5pm">오후 반차 (0.5일)</option>
                 </select>
-                <button onclick="applyLeave()" style="background:var(--secondary-color);">신청하기</button>
+                <button class="btn-secondary" onclick="applyLeave()">신청하기</button>
 
                 <div id="calendarContainer">
                     <div class="calendar-header">
@@ -85,8 +83,8 @@
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <h2 style="margin: 0;">👑 팀원 연차 현황</h2>
                 <div>
-                    <button onclick="downloadCSV()" style="width: auto; padding: 5px 12px; margin: 0 5px 0 0; background: var(--secondary-color); font-size: 12px; border-radius: 6px;">엑셀 다운로드</button>
-                    <button onclick="logout()" style="width: auto; padding: 5px 12px; margin: 0; background: var(--dark-gray); font-size: 12px; border-radius: 6px;">로그아웃</button>
+                    <button class="btn-secondary btn-sm" onclick="downloadCSV()">엑셀 다운로드</button>
+                    <button class="btn-gray btn-sm" onclick="logout()">로그아웃</button>
                 </div>
             </div>
             <p>전체 팀원의 남은 연차를 확인합니다.</p>

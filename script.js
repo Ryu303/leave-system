@@ -477,8 +477,8 @@ async function showAdminView() {
                 <span style="margin-left: 10px; font-size: 0.9em; color: #666;">남은 연차: <strong style="color: var(--primary-color);">${(u.total - u.used).toFixed(1)}일</strong></span>
             </div>
             <div>
-                <button onclick="resetUserPassword('${name}')" style="width: auto; padding: 5px 10px; margin: 0 5px 0 0; background: var(--danger-color); font-size: 12px; border-radius: 6px;">비번 초기화</button>
-                <button onclick="deleteUserAccount('${name}')" style="width: auto; padding: 5px 10px; margin: 0; background: #6b7280; font-size: 12px; border-radius: 6px;">계정 삭제</button>
+                <button class="btn-danger btn-sm" onclick="resetUserPassword('${name}')">비번 초기화</button>
+                <button class="btn-gray btn-sm" onclick="deleteUserAccount('${name}')">계정 삭제</button>
             </div>
         `;
         userListContainer.appendChild(item);
@@ -511,8 +511,8 @@ async function showAdminView() {
                 const typeStr = h.type == 1 ? '연차' : (h.subType === '0.5pm' ? '오후 반차' : (h.subType === '0.5am' ? '오전 반차' : '반차'));
                 item.innerHTML = `
                     <div style="margin-bottom: 5px;"><strong>${name}</strong> - ${h.date} (${typeStr})</div>
-                    <button onclick="approveLeave('${name}', '${h.id}')" style="background: #4CAF50; color: white; border: none; padding: 5px 10px; cursor: pointer;">승인</button>
-                    <button onclick="rejectLeave('${name}', '${h.id}')" style="background: #f44336; color: white; border: none; padding: 5px 10px; cursor: pointer; margin-left: 5px;">반려</button>
+                    <button class="btn-success btn-sm" onclick="approveLeave('${name}', '${h.id}')">승인</button>
+                    <button class="btn-danger btn-sm" onclick="rejectLeave('${name}', '${h.id}')">반려</button>
                 `;
                 pendingList.appendChild(item);
             }
@@ -522,7 +522,7 @@ async function showAdminView() {
     if (!hasPending) {
         pendingList.innerHTML = '<p style="color:#666; margin-top: 10px;">대기 중인 신청이 없습니다.</p>';
     } else {
-        pendingHeader.innerHTML += `<button onclick="approveAllLeaves()" style="width: auto; padding: 5px 12px; margin: 0; background: var(--secondary-color); font-size: 12px; border-radius: 6px;">모두 승인</button>`;
+        pendingHeader.innerHTML += `<button class="btn-secondary btn-sm" onclick="approveAllLeaves()">모두 승인</button>`;
     }
     
     pendingContainer.appendChild(pendingHeader);

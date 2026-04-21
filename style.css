@@ -41,7 +41,7 @@ body {
     transition: background 0.3s, border-color 0.3s;
 }
 hr { border: none; border-top: 1px solid var(--border-color) !important; }
-input, select {
+input:not([type="checkbox"]), select {
     width: 100%;
     padding: 12px 16px;
     margin: 8px 0 16px;
@@ -58,6 +58,26 @@ input:focus, select:focus {
     outline: none;
     border-color: var(--primary-color);
     box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    margin: 0 10px 0 0;
+    accent-color: var(--primary-color);
+    cursor: pointer;
+}
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-color);
+    cursor: pointer;
+    margin-bottom: 12px;
+    background: var(--light-gray);
+    padding: 14px 16px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
 }
 button {
     width: 100%;
@@ -78,6 +98,24 @@ button {
 }
 button:hover { background: var(--primary-hover); transform: translateY(-1px); box-shadow: 0 6px 16px rgba(49, 130, 246, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.4); }
 button:active { transform: translateY(0); }
+
+/* 버튼 공통 클래스 */
+.btn-primary { background: var(--primary-grad) !important; color: white !important; box-shadow: 0 4px 12px rgba(49, 130, 246, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important; }
+.btn-primary:hover { background: var(--primary-hover) !important; box-shadow: 0 6px 16px rgba(49, 130, 246, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.4) !important; }
+.btn-secondary, .btn-success { background: var(--secondary-grad) !important; color: white !important; box-shadow: 0 4px 12px rgba(4, 192, 158, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important; }
+.btn-secondary:hover, .btn-success:hover { box-shadow: 0 6px 16px rgba(4, 192, 158, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.4) !important; }
+.btn-danger { background: var(--danger-grad) !important; color: white !important; box-shadow: 0 4px 12px rgba(240, 68, 82, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important; }
+.btn-danger:hover { box-shadow: 0 6px 16px rgba(240, 68, 82, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.4) !important; }
+.btn-gray { background: linear-gradient(135deg, #8b95a1 0%, #6b7684 100%) !important; color: white !important; box-shadow: 0 4px 12px rgba(139, 149, 161, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.2) !important; }
+.btn-gray:hover { box-shadow: 0 6px 16px rgba(139, 149, 161, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important; }
+.btn-sm {
+    width: auto !important;
+    padding: 8px 14px !important;
+    margin: 0 4px 0 0 !important;
+    font-size: 13px !important;
+    border-radius: 8px !important;
+    display: inline-block;
+}
 .dark-mode-toggle {
     position: fixed; top: 20px; right: 20px; width: 45px; height: 45px; padding: 0;
     border-radius: 50%; background: var(--card-bg); border: 1px solid var(--border-color);
@@ -250,12 +288,6 @@ button:active { transform: translateY(0); }
 #modalInput {
     margin-bottom: 20px;
 }
-
-/* JS 버튼 인라인 스타일 오버라이드 (그라데이션 & 입체감 적용) */
-button[style*="--secondary-color"], button[style*="#4CAF50"] { background: var(--secondary-grad) !important; color: white !important; box-shadow: 0 4px 12px rgba(4, 192, 158, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important; }
-button[style*="--danger-color"], button[style*="#f44336"] { background: var(--danger-grad) !important; color: white !important; box-shadow: 0 4px 12px rgba(240, 68, 82, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important; }
-button[style*="--dark-gray"], button[style*="#6b7280"], button[style*="#9ca3af"], button[style*="#4b5563"] { background: linear-gradient(135deg, #8b95a1 0%, #6b7684 100%) !important; color: white !important; box-shadow: 0 4px 12px rgba(139, 149, 161, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.2) !important; }
-button[style*="--primary-color"] { background: var(--primary-grad) !important; color: white !important; box-shadow: 0 4px 12px rgba(49, 130, 246, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.3) !important; }
 
 /* JS 인라인 스타일 오버라이드 (SaaS 톤 통일) */
 [style*="color: #666"], [style*="color:#666"] { color: var(--text-muted) !important; }
