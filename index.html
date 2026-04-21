@@ -2,6 +2,10 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#6366f1">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192x192.png">
     <title>연차 관리 시스템</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,6 +16,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 </head>
 <body>
+    <button id="darkModeToggle" onclick="toggleDarkMode()" style="position: fixed; top: 20px; right: 20px; width: 45px; height: 45px; padding: 0; border-radius: 50%; background: rgba(255,255,255,0.2); backdrop-filter: blur(5px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.3); font-size: 20px; cursor: pointer; z-index: 1000; display: flex; align-items: center; justify-content: center; transition: all 0.3s;">🌙</button>
     <div class="container">
         <div class="card" id="userView">
             <h2>📅 연차 관리 시스템</h2>
@@ -34,7 +39,8 @@
             <div id="info" style="display:none;">
                 <div style="text-align: right; margin-bottom: 15px;">
                     <strong id="loggedInUserName" style="color: var(--primary-color);"></strong>님 환영합니다. 
-                    <button onclick="logout()" style="width: auto; padding: 5px 12px; margin-left: 10px; background: var(--dark-gray); font-size: 12px; border-radius: 6px;">로그아웃</button>
+                    <button onclick="changeMyPassword()" style="width: auto; padding: 5px 12px; margin-left: 10px; background: var(--primary-color); font-size: 12px; border-radius: 6px;">비밀번호 변경</button>
+                    <button onclick="logout()" style="width: auto; padding: 5px 12px; margin-left: 5px; background: var(--dark-gray); font-size: 12px; border-radius: 6px;">로그아웃</button>
                 </div>
                 <div class="status">
                     <div>남은 연차<strong id="remain">0</strong></div>
@@ -67,10 +73,24 @@
         <div class="card" id="adminView">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <h2 style="margin: 0;">👑 팀원 연차 현황</h2>
-                <button onclick="logout()" style="width: auto; padding: 5px 12px; margin: 0; background: var(--dark-gray); font-size: 12px; border-radius: 6px;">로그아웃</button>
+                <div>
+                    <button onclick="downloadCSV()" style="width: auto; padding: 5px 12px; margin: 0 5px 0 0; background: var(--secondary-color); font-size: 12px; border-radius: 6px;">엑셀 다운로드</button>
+                    <button onclick="logout()" style="width: auto; padding: 5px 12px; margin: 0; background: var(--dark-gray); font-size: 12px; border-radius: 6px;">로그아웃</button>
+                </div>
             </div>
             <p>전체 팀원의 남은 연차를 확인합니다.</p>
             <div id="userList" style="margin-top: 20px;"></div>
+
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 30px 0 20px 0;">
+            <h3 style="margin-bottom: 15px;">📅 전체 팀원 휴가 달력</h3>
+            <div id="adminCalendarContainer">
+                <div class="calendar-header">
+                    <button onclick="changeAdminMonth(-1)">‹</button>
+                    <h4 id="adminCalendarTitle" style="margin: 0;"></h4>
+                    <button onclick="changeAdminMonth(1)">›</button>
+                </div>
+                <div id="adminCalendarGrid"></div>
+            </div>
         </div>
     </div>
 
@@ -87,5 +107,14 @@
     </div>
 
     <script src="script.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Service Worker 등록 성공', reg.scope))
+                    .catch(err => console.log('Service Worker 등록 실패', err));
+            });
+        }
+    </script>
 </body>
 </html>

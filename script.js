@@ -2,6 +2,22 @@ let db = {};
 
 let currentName = '';
 let calendarDate = new Date();
+let adminCalendarDate = new Date(); // 관리자 달력용 날짜 상태
+
+// --- 다크 모드 (Dark Mode) ---
+if (localStorage.getItem('darkMode') === 'true') {
+    document.body.classList.add('dark-mode');
+    const toggleBtn = document.getElementById('darkModeToggle');
+    if(toggleBtn) toggleBtn.innerText = '☀️';
+}
+
+function toggleDarkMode() {
+    const body = document.body;
+    body.classList.toggle('dark-mode');
+    const isDark = body.classList.contains('dark-mode');
+    localStorage.setItem('darkMode', isDark);
+    document.getElementById('darkModeToggle').innerText = isDark ? '☀️' : '🌙';
+}
 
 // --- 다른 PC 연동 (Firebase 설정) ---
 // 외부 PC와 데이터를 연동하려면 index.html의 <head> 태그 안에 아래 스크립트를 먼저 추가해야 합니다.
@@ -197,6 +213,29 @@ function registerUser() {
     loginSuccess(currentName);
 }
 
+// 사용자 본인 비밀번호 변경
+async function changeMyPassword() {
+    if (!currentName || !db[currentName]) return;
+
+    const currentPwd = await openModal('현재 비밀번호를 입력하세요:', 'prompt');
+    if (currentPwd === null) return;
+
+    if (currentPwd !== db[currentName].password) {
+        return showModal('현재 비밀번호가 일치하지 않습니다.');
+    }
+
+    const newPwd = await openModal('새로운 비밀번호를 입력하세요:', 'prompt');
+    if (newPwd === null) return;
+
+    if (newPwd.trim() === '') {
+        return showModal('비밀번호는 공백일 수 없습니다.');
+    }
+
+    db[currentName].password = newPwd.trim();
+    saveDB();
+    showModal('비밀번호가 성공적으로 변경되었습니다.');
+}
+
 // 연차 신청
 function applyLeave() {
     const type = parseFloat(document.getElementById('type').value);
@@ -365,7 +404,10 @@ async function showAdminView() {
                 <strong>${name}</strong>
                 <span style="margin-left: 10px; font-size: 0.9em; color: #666;">남은 연차: <strong style="color: var(--primary-color);">${(u.total - u.used).toFixed(1)}일</strong></span>
             </div>
-            <button onclick="resetUserPassword('${name}')" style="width: auto; padding: 5px 10px; margin: 0; background: var(--danger-color); font-size: 12px; border-radius: 6px;">비번 초기화</button>
+            <div>
+                <button onclick="resetUserPassword('${name}')" style="width: auto; padding: 5px 10px; margin: 0 5px 0 0; background: var(--danger-color); font-size: 12px; border-radius: 6px;">비번 초기화</button>
+                <button onclick="deleteUserAccount('${name}')" style="width: auto; padding: 5px 10px; margin: 0; background: #6b7280; font-size: 12px; border-radius: 6px;">계정 삭제</button>
+            </div>
         `;
         userListContainer.appendChild(item);
     });
@@ -401,6 +443,9 @@ async function showAdminView() {
         pendingContainer.innerHTML += '<p style="color:#666;">대기 중인 신청이 없습니다.</p>';
     }
     userListContainer.appendChild(pendingContainer);
+
+    // 전체 팀원 달력 렌더링
+    renderAdminCalendar(adminCalendarDate.getFullYear(), adminCalendarDate.getMonth());
 }
 
 // 관리자: 연차 승인
@@ -454,6 +499,19 @@ async function resetUserPassword(userName) {
     }
 }
 
+// 관리자: 사용자 계정 삭제 (퇴사자 처리)
+async function deleteUserAccount(userName) {
+    const confirmed = await openModal(`정말 ${userName}님의 계정과 모든 연차 기록을 삭제하시겠습니까?\n(이 작업은 되돌릴 수 없습니다!)`, 'confirm');
+    if (!confirmed) return;
+
+    if (db[userName]) {
+        delete db[userName]; // 데이터베이스에서 사용자 완전히 삭제
+        saveDB();
+        showModal(`${userName}님의 계정이 성공적으로 삭제되었습니다.`);
+        showAdminView(); // 목록 새로고침
+    }
+}
+
 // 달력 이동
 function changeMonth(offset) {
     calendarDate.setMonth(calendarDate.getMonth() + offset);
@@ -497,8 +555,8 @@ function renderCalendar(year, month, history) {
         dayEl.onclick = () => {
             selectDateFromCalendar(currentDateStr);
             // 시각적 피드백
-            document.querySelectorAll('.calendar-day').forEach(el => el.style.background = '');
-            dayEl.style.background = '#e0e7ff';
+            document.querySelectorAll('.calendar-day').forEach(el => el.classList.remove('selected'));
+            dayEl.classList.add('selected');
         };
 
         // 해당 날짜에 연차 기록이 있는지 확인
@@ -507,6 +565,63 @@ function renderCalendar(year, month, history) {
             dayEl.classList.add('has-leave');
             if (leaveOnDay.type == 0.5) {
                 dayEl.classList.add('has-half-leave');
+            }
+        }
+        grid.appendChild(dayEl);
+    }
+}
+
+// 관리자용 달력 이동
+function changeAdminMonth(offset) {
+    adminCalendarDate.setMonth(adminCalendarDate.getMonth() + offset);
+    renderAdminCalendar(adminCalendarDate.getFullYear(), adminCalendarDate.getMonth());
+}
+
+// 관리자용 전체 팀원 달력 그리기
+function renderAdminCalendar(year, month) {
+    const grid = document.getElementById('adminCalendarGrid');
+    grid.innerHTML = '';
+    document.getElementById('adminCalendarTitle').innerText = `${year}년 ${month + 1}월`;
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    // 요일 헤더
+    ['일', '월', '화', '수', '목', '금', '토'].forEach(day => {
+        const dayNameEl = document.createElement('div');
+        dayNameEl.className = 'admin-calendar-day-name';
+        dayNameEl.innerText = day;
+        grid.appendChild(dayNameEl);
+    });
+
+    // 빈 칸 채우기
+    for (let i = 0; i < firstDay; i++) {
+        grid.appendChild(document.createElement('div'));
+    }
+
+    // 날짜 채우기
+    for (let day = 1; day <= daysInMonth; day++) {
+        const dayEl = document.createElement('div');
+        dayEl.className = 'admin-calendar-day';
+        
+        const dateSpan = document.createElement('span');
+        dateSpan.innerText = day;
+        dateSpan.style.marginBottom = '2px';
+        dayEl.appendChild(dateSpan);
+        
+        const currentDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        
+        // 해당 날짜에 연차 기록이 있는 모든 사용자 찾기
+        for (let name in db) {
+            if (db[name].history) {
+                const leave = db[name].history.find(h => h.date === currentDateStr && h.status !== 'rejected');
+                if (leave) {
+                    const tag = document.createElement('div');
+                    tag.className = `admin-leave-tag ${leave.type == 1 ? 'full' : 'half'} ${leave.status === 'pending' ? 'pending' : ''}`;
+                    tag.innerText = `${name}${leave.type == 0.5 ? '(반)' : ''}`;
+                    tag.title = `${name} - ${leave.type == 1 ? '연차' : '반차'} ${leave.status === 'pending' ? '(대기중)' : '(승인됨)'}`;
+                    dayEl.appendChild(tag);
+                }
             }
         }
         grid.appendChild(dayEl);
