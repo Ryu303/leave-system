@@ -2261,12 +2261,18 @@ db.ref('users').on('value', (snapshot) => {
 });
 
 function renderMembersDirectory() {
-    const container = document.getElementById('member-directory');
-    if (!container) return;
-    container.innerHTML = '';
+    const lists = ['ceo', 'health_leader', 'health_member', 'marketing', 'bidding', 'unassigned'];
+    lists.forEach(id => {
+        const el = document.getElementById('list-' + id);
+        if (el) el.innerHTML = '';
+    });
 
     const currentUid = auth.currentUser ? auth.currentUser.uid : null;
     if (!currentUid) return;
+    
+    const isAdmin = currentUid === ADMIN_UID;
+    const guide = document.getElementById('org-admin-guide');
+    if (guide) guide.style.display = isAdmin ? 'block' : 'none';
 
     Object.keys(globalUsersData).forEach(uid => {
         const user = globalUsersData[uid];
@@ -2284,24 +2290,47 @@ function renderMembersDirectory() {
 
         const isMe = uid === currentUid;
         const card = document.createElement('div');
-        card.className = 'trip-card';
-        card.style.flexDirection = 'row';
-        card.style.alignItems = 'center';
-        card.style.gap = '1rem';
+        card.className = 'org-card' + (isAdmin ? ' draggable' : '');
+        
+        // 최고 관리자일 때만 드래그 앤 드롭 활성화
+        if (isAdmin) {
+            card.draggable = true;
+            card.ondragstart = (e) => dragMember(e, uid);
+        }
         
         card.innerHTML = `
-            <img src="${user.photoURL || 'https://via.placeholder.com/50'}" style="width: 50px; height: 50px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border-color);">
-            <div style="flex: 1;">
-                <div style="font-weight: 700; font-size: 1.05rem; display: flex; align-items: center; gap: 0.5rem;">
-                    ${user.displayName} ${isMe ? '<span style="font-size: 0.7rem; color: var(--primary);">(나)</span>' : ''}
+            <img src="${user.photoURL || 'https://via.placeholder.com/50'}" style="width: 54px; height: 54px; border-radius: 50%; object-fit: cover; border: 2px solid var(--border-color); box-shadow: var(--shadow-sm);">
+            <div style="flex: 1; overflow: hidden;">
+                <div style="font-weight: 800; font-size: 1.1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-main);">
+                    ${user.displayName} ${isMe ? '<span style="font-size: 0.8rem; color: var(--primary);">(나)</span>' : ''}
                 </div>
-                <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.2rem;">${user.email}</div>
-                <div style="margin-top: 0.5rem;">${statusBadge}</div>
+                <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.3rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${user.email}</div>
+                <div style="margin-top: 0.6rem;">${statusBadge}</div>
             </div>
-            ${!isMe ? `<button onclick="openPrivateChat('${uid}', '${user.displayName}')" style="display:flex; align-items:center; gap:4px; padding:0.5rem 0.8rem; font-size:0.8rem;"><span class="material-symbols-rounded" style="font-size:1.2rem;">chat</span> 1:1 채팅</button>` : ''}
+            ${!isMe ? `<button onclick="openPrivateChat('${uid}', '${user.displayName}')" style="padding:0.5rem; border-radius:50%; display:flex; align-items:center; justify-content:center; background-color: var(--col-bg); color: var(--text-muted); border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); transition: all 0.2s;" onmouseover="this.style.color='var(--primary)'; this.style.borderColor='var(--primary)'" onmouseout="this.style.color='var(--text-muted)'; this.style.borderColor='var(--border-color)'" title="1:1 채팅"><span class="material-symbols-rounded" style="font-size:1.2rem;">chat</span></button>` : ''}
         `;
-        container.appendChild(card);
+        
+        const dept = user.department || 'unassigned'; // DB에 부서가 없으면 미지정으로
+        const targetList = document.getElementById('list-' + dept);
+        if (targetList) targetList.appendChild(card);
     });
+}
+
+function dragMember(ev, uid) { 
+    ev.dataTransfer.setData("uid", uid); 
+}
+
+async function dropMember(ev, newDept) {
+    ev.preventDefault();
+    const uid = ev.dataTransfer.getData("uid");
+    if (uid) {
+        if (auth.currentUser.uid !== ADMIN_UID) return await customAlert('최고 관리자만 조직도를 수정할 수 있습니다.');
+        
+        db.ref('users/' + uid).update({ department: newDept }).catch(async (err) => {
+            console.error("조직도 변경 실패:", err);
+            await customAlert("조직도 변경 실패! 권한을 확인해주세요.");
+        });
+    }
 }
 
 let currentPrivateChatTargetUid = null;
@@ -2366,4 +2395,256 @@ async function sendPrivateMessage() {
 
     try { await db.ref(`privateChats/${chatId}`).push(messageData); } 
     catch (err) { console.error(err); await customAlert("전송 실패: 파이어베이스 규칙을 확인해주세요."); }
+}
+
+// ----------------------------------------------------
+// 채팅창 드래그 앤 드롭 (이동) 기능 (PC & 모바일 지원)
+// ----------------------------------------------------
+function makeDraggable(elementId) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+    const header = el.querySelector('.chat-header');
+    if (!header) return;
+
+    let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+
+    // PC 마우스 이벤트
+    header.onmousedown = dragMouseDown;
+    // 모바일 터치 이벤트
+    header.addEventListener('touchstart', dragTouchStart, { passive: false });
+
+    function initDrag(clientX, clientY) {
+        const rect = el.getBoundingClientRect();
+        // 위치를 bottom/right에서 top/left 고정 좌표로 변환하여 튀는 현상 방지
+        if (el.style.bottom || el.style.right || !el.style.top) {
+            el.style.bottom = 'auto';
+            el.style.right = 'auto';
+            el.style.top = rect.top + 'px';
+            el.style.left = rect.left + 'px';
+        }
+        pos3 = clientX;
+        pos4 = clientY;
+    }
+
+    function dragMouseDown(e) {
+        if (e.target.closest('.close-btn')) return; // 닫기 버튼은 제외
+        e.preventDefault();
+        initDrag(e.clientX, e.clientY);
+        document.onmouseup = closeDragElement;
+        document.onmousemove = elementDrag;
+    }
+
+    function dragTouchStart(e) {
+        if (e.target.closest('.close-btn')) return;
+        e.preventDefault();
+        initDrag(e.touches[0].clientX, e.touches[0].clientY);
+        document.addEventListener('touchend', closeDragElement);
+        document.addEventListener('touchmove', elementTouchDrag, { passive: false });
+    }
+
+    function calculateMove(clientX, clientY) {
+        pos1 = pos3 - clientX;
+        pos2 = pos4 - clientY;
+        pos3 = clientX;
+        pos4 = clientY;
+        
+        let newTop = el.offsetTop - pos2;
+        let newLeft = el.offsetLeft - pos1;
+        
+        if (newTop < 0) newTop = 0; // 화면 천장 위로 넘어가지 않게 방어
+        
+        el.style.top = newTop + "px";
+        el.style.left = newLeft + "px";
+    }
+
+    function elementDrag(e) { e.preventDefault(); calculateMove(e.clientX, e.clientY); }
+    function elementTouchDrag(e) { e.preventDefault(); calculateMove(e.touches[0].clientX, e.touches[0].clientY); }
+
+    function closeDragElement() {
+        document.onmouseup = null;
+        document.onmousemove = null;
+        document.removeEventListener('touchend', closeDragElement);
+        document.removeEventListener('touchmove', elementTouchDrag);
+    }
+}
+
+// 두 채팅창에 드래그 기능 적용
+makeDraggable('chat-window');
+makeDraggable('private-chat-window');
+
+// ----------------------------------------------------
+// 1:1 채팅 실시간 알림 및 자동 열기 기능
+// ----------------------------------------------------
+let privateChatListeners = {};
+let initTimeForPrivateChats = Date.now();
+
+function setupPrivateChatNotificationListeners() {
+    const currentUid = auth.currentUser ? auth.currentUser.uid : null;
+    if (!currentUid) return;
+
+    Object.keys(globalUsersData).forEach(targetUid => {
+        if (targetUid === currentUid) return;
+        
+        const chatId = getPrivateChatId(currentUid, targetUid);
+        if (!privateChatListeners[chatId]) {
+            const targetName = globalUsersData[targetUid].displayName;
+            
+            db.ref(`privateChats/${chatId}`).limitToLast(1).on('child_added', (snapshot) => {
+                const msg = snapshot.val();
+                // 초기 로딩 시점 이후에 도착한 '남이 보낸 메시지'만 반응
+                if (msg && msg.uid !== currentUid && msg.timestamp > initTimeForPrivateChats) {
+                    showToast(`💬 [1:1 채팅] ${targetName}님:\n${msg.text}`, 'info');
+                    
+                    // 채팅창이 닫혀있거나 다른 사람과 대화 중일 경우 자동으로 해당 사람의 채팅창을 열어줌
+                    if (currentPrivateChatTargetUid !== targetUid) {
+                        openPrivateChat(targetUid, targetName);
+                    }
+                }
+            });
+            privateChatListeners[chatId] = true;
+        }
+    });
+}
+
+// ----------------------------------------------------
+// 전사 공지사항 (Notice Board) 기능
+// ----------------------------------------------------
+let globalNoticesData = {};
+let currentNoticeId = null;
+
+db.ref('notices').on('value', (snapshot) => {
+    globalNoticesData = snapshot.val() || {};
+    renderNotices();
+});
+
+function renderNotices() {
+    const listEl = document.getElementById('notice-list');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    
+    const noticesArray = Object.values(globalNoticesData).sort((a, b) => b.timestamp - a.timestamp);
+    
+    if (noticesArray.length === 0) {
+        listEl.innerHTML = '<li style="justify-content: center; padding: 2rem; color: var(--text-muted); display:flex;">등록된 공지사항이 없습니다.</li>';
+        return;
+    }
+
+    noticesArray.forEach(notice => {
+        const li = document.createElement('li');
+        li.className = 'notice-item';
+        const d = new Date(notice.timestamp);
+        const dateStr = `${d.getFullYear().toString().slice(2)}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        
+        // 작성된 지 3일 이내면 N(New) 배지 표시
+        const isNew = (Date.now() - notice.timestamp) < 3 * 24 * 60 * 60 * 1000;
+        const newBadge = isNew ? '<span style="background-color: var(--danger); color: white; font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: 10px; margin-left: 6px; vertical-align: top; font-weight: bold;">N</span>' : '';
+
+        li.innerHTML = `
+            <div class="notice-item-title">${notice.title} ${newBadge}</div>
+            <div class="notice-item-author">${notice.author}</div>
+            <div class="notice-item-date">${dateStr}</div>
+            <div class="notice-item-views">${notice.views || 0}</div>
+        `;
+        li.onclick = () => viewNotice(notice.id);
+        listEl.appendChild(li);
+    });
+}
+
+function viewNotice(id) {
+    const notice = globalNoticesData[id];
+    if (!notice) return;
+    
+    currentNoticeId = id;
+    document.getElementById('noticeTitleInput').value = notice.title;
+    document.getElementById('noticeContentInput').value = notice.content;
+    
+    document.getElementById('noticeInfo').style.display = 'flex';
+    const d = new Date(notice.timestamp);
+    document.getElementById('noticeAuthorDate').innerHTML = `<span class="material-symbols-rounded" style="font-size:1.1em; vertical-align:middle; margin-right:4px;">person</span>${notice.author} <span style="margin: 0 8px; color: var(--border-color);">|</span> <span class="material-symbols-rounded" style="font-size:1.1em; vertical-align:middle; margin-right:4px;">schedule</span>${d.toLocaleString('ko-KR', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}`;
+    document.getElementById('noticeViews').innerHTML = `<span class="material-symbols-rounded" style="font-size:1.1em; vertical-align:middle; margin-right:4px;">visibility</span>${(notice.views || 0) + 1}`;
+    
+    // 본인이 쓴 글이거나 최고 관리자일 경우에만 수정/삭제 버튼 표시 및 입력 활성화
+    const isAuthorOrAdmin = (auth.currentUser && auth.currentUser.uid === notice.uid) || (auth.currentUser && auth.currentUser.uid === ADMIN_UID);
+    document.getElementById('noticeTitleInput').readOnly = !isAuthorOrAdmin;
+    document.getElementById('noticeContentInput').readOnly = !isAuthorOrAdmin;
+    document.getElementById('noticeTitleInput').style.border = isAuthorOrAdmin ? '' : 'none';
+    document.getElementById('noticeContentInput').style.border = isAuthorOrAdmin ? '' : 'none';
+    
+    document.getElementById('noticeDeleteBtn').style.display = isAuthorOrAdmin ? 'block' : 'none';
+    document.getElementById('noticeSaveBtn').style.display = isAuthorOrAdmin ? 'block' : 'none';
+    
+    document.getElementById('noticeModal').style.display = 'flex';
+    
+    // 조회수 1 증가 (서버에 실시간 반영)
+    db.ref('notices/' + id + '/views').set((notice.views || 0) + 1);
+}
+
+function openNoticeModal() {
+    if (!currentUserProfile || !currentUserProfile.approved) return customAlert('승인된 사용자만 공지를 작성할 수 있습니다.');
+    currentNoticeId = null;
+    document.getElementById('noticeTitleInput').value = '';
+    document.getElementById('noticeContentInput').value = '';
+    document.getElementById('noticeTitleInput').readOnly = false;
+    document.getElementById('noticeContentInput').readOnly = false;
+    document.getElementById('noticeTitleInput').style.border = '';
+    document.getElementById('noticeContentInput').style.border = '';
+    
+    document.getElementById('noticeInfo').style.display = 'none';
+    document.getElementById('noticeDeleteBtn').style.display = 'none';
+    document.getElementById('noticeSaveBtn').style.display = 'block';
+    
+    document.getElementById('noticeModal').style.display = 'flex';
+}
+
+function closeNoticeModal() {
+    document.getElementById('noticeModal').style.display = 'none';
+    currentNoticeId = null;
+}
+
+async function saveNotice() {
+    if (!currentUserProfile || !currentUserProfile.approved) return await customAlert('권한이 없습니다.');
+    
+    const title = document.getElementById('noticeTitleInput').value.trim();
+    const content = document.getElementById('noticeContentInput').value.trim();
+    
+    if (!title) return await customAlert('공지 제목을 입력하세요.');
+    if (!content) return await customAlert('공지 내용을 입력하세요.');
+    
+    const saveBtn = document.getElementById('noticeSaveBtn');
+    saveBtn.disabled = true;
+    
+    const data = {
+        title: title,
+        content: content,
+        author: currentUserProfile.displayName,
+        uid: auth.currentUser.uid,
+        timestamp: currentNoticeId ? globalNoticesData[currentNoticeId].timestamp : Date.now(),
+        views: currentNoticeId ? globalNoticesData[currentNoticeId].views : 0
+    };
+    
+    try {
+        if (currentNoticeId) {
+            await db.ref('notices/' + currentNoticeId).update(data);
+        } else {
+            const newRef = db.ref('notices').push();
+            data.id = newRef.key;
+            await newRef.set(data);
+        }
+        closeNoticeModal();
+        showToast('공지사항이 저장되었습니다.', 'info');
+    } catch (err) {
+        console.error(err);
+        await customAlert("저장 실패: 파이어베이스 규칙을 확인해주세요.");
+    } finally {
+        saveBtn.disabled = false;
+    }
+}
+
+async function deleteNotice() {
+    if (!currentNoticeId) return;
+    if (!await customConfirm('이 공지사항을 완전히 삭제하시겠습니까?')) return;
+    
+    await db.ref('notices/' + currentNoticeId).remove();
+    closeNoticeModal();
+    showToast('공지사항이 삭제되었습니다.', 'info');
 }
