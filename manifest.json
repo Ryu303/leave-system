@@ -1,10 +1,10 @@
 {
-  "name": "연차 관리 시스템",
-  "short_name": "연차관리",
+  "name": "FaWW Workspace",
+  "short_name": "FaWW",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#6366f1",
+  "background_color": "#F3F4F6",
+  "theme_color": "#4F46E5",
   "icons": [
     {
       "src": "icon-192x192.png",

@@ -1,9 +1,12 @@
-const CACHE_NAME = 'leave-app-v6';
+const CACHE_NAME = 'faww-workspace-v5';
 const urlsToCache = [
     './',
     './index.html',
     './style.css',
-    './script.js'
+    './script.js',
+    './manifest.json',
+    './icon-192x192.png',
+    './icon-512x512.png'
 ];
 
 self.addEventListener('install', event => {
