@@ -990,3 +990,50 @@ select option {
 .org-card.draggable { cursor: grab; border-left: 4px solid var(--primary); }
 .org-card.draggable:active { cursor: grabbing; }
 .org-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+
+/* ==================== 
+   스마트 동선 지도 및 리스트 
+==================== */
+.map-container-grid { 
+    display: grid; grid-template-columns: 1fr; gap: 1rem; margin-top: 1rem; 
+}
+@media (min-width: 768px) { 
+    .map-container-grid { grid-template-columns: 3fr 2fr; } 
+}
+.trip-map-area { 
+    width: 100%; height: 400px; min-height: 400px; 
+    background-color: var(--card-bg); border-radius: 12px; 
+    border: 1px solid var(--border-color); overflow: hidden; 
+    display: flex; justify-content: center; align-items: center; text-align: center; 
+}
+.trip-route-list { 
+    display: flex; flex-direction: column; gap: 0.8rem; 
+    max-height: 400px; overflow-y: auto; padding-right: 4px; 
+}
+.route-item { 
+    display: flex; gap: 1rem; padding: 1rem; 
+    background-color: var(--card-bg); border-radius: 12px; 
+    border: 1px solid var(--border-color); box-shadow: var(--shadow-sm); align-items: flex-start; 
+}
+.route-item-number { 
+    background-color: #3B82F6; color: white; width: 28px; height: 28px; 
+    border-radius: 50%; display: flex; justify-content: center; align-items: center; 
+    font-weight: bold; flex-shrink: 0; font-size: 0.9rem; margin-top: 0.2rem; 
+}
+.route-item-info { flex: 1; display: flex; flex-direction: column; gap: 0.2rem; }
+.route-item-title { font-weight: 700; font-size: 1rem; color: var(--text-main); }
+.route-item-address { font-size: 0.85rem; color: var(--text-muted); }
+.route-item-dist { font-size: 0.8rem; color: var(--primary); font-weight: 600; margin-top: 0.2rem; }
+
+.route-team-header {
+    margin-top: 1.5rem;
+    padding: 0.6rem 1rem;
+    border-left: 5px solid; /* 색상은 JS에서 동적으로 설정 */
+    font-weight: 700;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: var(--col-bg);
+    border-radius: 8px;
+}

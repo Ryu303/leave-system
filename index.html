@@ -27,8 +27,8 @@
     <!-- Material Symbols (모던 아이콘) 추가 -->
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
 
-    <!-- 네이버 지도 API (JS 서브모듈 방식) -->
-    <script type="text/javascript" src="https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=6pjpjrzqb7&submodules=geocoder"></script>
+    <!-- 카카오 지도 API (JS SDK) -->
+    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=49567b3deb7ec9afb54384571d730980&libraries=services"></script>
 </head>
 <body>
     <div class="header">
@@ -231,15 +231,20 @@
             <!-- 스마트 출장 동선 지도 섹션 -->
             <div style="background-color: var(--col-bg); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem; border: 1px solid var(--border-color);">
                 <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--primary); display: flex; align-items: center; gap: 6px;"><span class="material-symbols-rounded">route</span> 스마트 동선 최적화 (지도)</h3>
-                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
-                    <input type="text" id="mapAssignee" placeholder="담당자 이름 (예: 홍길동)" class="search-input" style="flex: 1; min-width: 120px;">
-                    <input type="text" id="mapStartDate" class="date-select-btn" placeholder="시작일" style="flex: 1; min-width: 100px; padding: 0.6rem;">
+                <div style="font-size: 0.85rem; color: var(--text-muted); width: 100%; margin-bottom: 0.5rem;">💡 아래 목록에서 원하는 출장지의 <b>체크박스</b>를 직접 선택하거나, 담당자/기간을 입력해 자동 검색하세요.</div>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; align-items: center;">
+                    <input type="text" id="mapAssignee" placeholder="담당자 이름 (체크박스 선택 시 무시됨)" class="search-input" style="flex: 1; min-width: 120px;">
+                    <input type="text" id="mapStartDate" class="date-select-btn" placeholder="시작일" style="flex: 1; min-width: 80px; padding: 0.6rem;">
                     <span style="align-self: center; font-weight: bold; color: var(--text-muted);">~</span>
-                    <input type="text" id="mapEndDate" class="date-select-btn" placeholder="종료일" style="flex: 1; min-width: 100px; padding: 0.6rem;">
+                    <input type="text" id="mapEndDate" class="date-select-btn" placeholder="종료일" style="flex: 1; min-width: 80px; padding: 0.6rem;">
+                    <input type="number" id="mapTeamCount" class="search-input" placeholder="팀 수" min="1" max="10" value="1" style="width: 70px; padding: 0.6rem;" title="해당 일자에 동시 운영할 팀(차량) 수">
+                    <label style="display:flex; align-items:center; gap:4px; font-size:0.85rem; color:var(--text-main); font-weight:600; margin-right: 0.5rem; cursor:pointer;">
+                        <input type="checkbox" id="mapStartFromHQ" checked style="width:16px; height:16px; cursor:pointer;"> 매일 본점 출발
+                    </label>
                     <button onclick="calculateOptimizedRoute()" style="background-color: #8B5CF6;">동선 그리기</button>
                 </div>
                 <div class="map-container-grid">
-                    <div id="tripMap" class="trip-map-area"><span style="color:var(--text-muted);">조건을 입력하고 동선 그리기를 누르세요.<br>(네이버 지도 Client ID 연동 필요)</span></div>
+                    <div id="tripMap" class="trip-map-area"><span style="color:var(--text-muted);">출장지를 체크하거나 검색 조건을 입력하고<br>동선 그리기를 누르세요.</span></div>
                     <div id="tripRouteList" class="trip-route-list"></div>
                 </div>
             </div>
