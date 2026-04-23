@@ -12,6 +12,7 @@ let currentViewMode = 'status';
 let currentDateForCalendar = new Date();
 let currentDateForGantt = new Date();
 let currentDateForModalCalendar = new Date();
+let currentDateForMyPageCalendar = new Date();
 
 // ----------------------------------------------------
 // Firebase 설정
@@ -785,22 +786,45 @@ async function saveTrip() {
         if (currentTripId) await db.ref('businessTrips/' + currentTripId).update(tripData);
         else { tripData.timestamp = Date.now(); const ref = db.ref('businessTrips').push(); tripData.id = ref.key; await ref.set(tripData); }
         closeTripModal();
-    } catch (e) { await customAlert("저장 실패"); } finally { saveBtn.disabled = false; saveBtn.textContent = '저장'; }
+    } catch (e) { 
+        await customAlert("저장 실패: " + e.message); 
+    } finally { 
+        saveBtn.disabled = false; saveBtn.textContent = '저장'; 
+    }
 }
 
 async function deleteTrip(id) {
     if (!currentUserProfile || !currentUserProfile.approved) return;
     if (!await customConfirm('출장을 삭제하시겠습니까?')) return;
-    db.ref('businessTrips/' + id).once('value').then(s => { const t = s.val(); if(t) { if(t.schedulePath) storage.ref(t.schedulePath).delete().catch(()=>{}); db.ref('businessTrips/' + id).remove(); }});
+    
+    try {
+        const trip = globalTripsData[id];
+        if (trip && trip.schedulePath) storage.ref(trip.schedulePath).delete().catch(()=>{});
+        
+        await db.ref('businessTrips/' + id).remove();
+        showToast('출장이 성공적으로 삭제되었습니다.', 'info');
+    } catch (error) {
+        await customAlert('❌ 삭제 실패: ' + error.message + '\n\n(파이어베이스 권한 또는 네트워크 문제일 수 있습니다)');
+    }
 }
 
 db.ref('businessTrips').on('value', (s) => {
-    globalTripsData = s.val() || {}; renderTasks(); if(typeof renderMyPage === 'function') renderMyPage();
+    globalTripsData = s.val() || {}; 
+    for(let key in globalTripsData) globalTripsData[key].id = key; // 진짜 DB 키로 강제 동기화
+    renderTasks(); if(typeof renderMyPage === 'function') renderMyPage();
     const list = document.getElementById('trip-list'); if (!list) return; list.innerHTML = '';
     Object.values(globalTripsData).sort((a,b) => (a.date ? new Date(a.date).getTime() : Infinity) - (b.date ? new Date(b.date).getTime() : Infinity)).forEach(trip => {
         const div = document.createElement('div'); div.className = 'trip-card';
         if (trip.date && new Date(trip.date).setHours(0,0,0,0) < new Date().setHours(0,0,0,0)) div.classList.add('past-trip');
         div.innerHTML = `<div class="trip-header"><div style="display:flex; align-items:flex-start; gap:10px;"><input type="checkbox" class="trip-checkbox" value="${trip.id}" style="width:18px; height:18px; margin-top:2px; cursor:pointer;" title="동선 최적화 선택"><div style="flex:1;"><div class="trip-title">${trip.name}</div><div class="trip-date">${trip.date}</div></div></div><div style="display:flex;gap:0.3rem;"><button class="delete-btn edit" style="padding:0.3rem;background:var(--col-bg);color:var(--text-main)"><span class="material-symbols-rounded">edit</span></button><button class="delete-btn del" style="padding:0.3rem"><span class="material-symbols-rounded">close</span></button></div></div><div class="trip-info-row">${trip.address}</div>`;
+        
+        div.onclick = (e) => {
+            if (e.target.closest('.edit') || e.target.closest('.del')) return;
+            if (e.target.tagName === 'INPUT' && e.target.type === 'checkbox') return;
+            const checkbox = div.querySelector('.trip-checkbox');
+            if (checkbox) checkbox.checked = !checkbox.checked;
+        };
+        
         div.querySelector('.edit').onclick = () => openTripModal(trip.id, trip.name, trip.date, trip.assignee, trip.contact, trip.address, trip.scheduleUrl, trip.schedulePath);
         div.querySelector('.del').onclick = () => deleteTrip(trip.id);
         list.appendChild(div);
@@ -866,7 +890,7 @@ function renderAdminLeaves() {
     const pendingListEl = document.getElementById('admin-pending-leaves-list');
     if (pendingListEl) {
         pendingListEl.innerHTML = '';
-        const pendingLeaves = Object.values(globalLeavesData).filter(l => l.status === 'pending');
+        const pendingLeaves = Object.values(globalLeavesData).filter(l => l.status === 'pending' || l.status === 'cancel_requested');
         
         if (pendingLeaves.length === 0) {
             pendingListEl.innerHTML = '<li style="justify-content: center; color: var(--text-muted); font-size: 0.9rem;">대기 중인 결재 건이 없습니다.</li>';
@@ -874,17 +898,18 @@ function renderAdminLeaves() {
             pendingLeaves.sort((a, b) => b.timestamp - a.timestamp).forEach(l => {
                 const li = document.createElement('li');
                 const typeText = l.type === 1 ? '연차(1일)' : (l.subType === '0.5am' ? '오전 반차' : '오후 반차');
+                const isCancel = l.status === 'cancel_requested';
                 
                 li.innerHTML = `
                     <div style="display:flex; flex-direction:column; gap:4px;">
                         <div style="font-weight:600; display:flex; align-items:center; gap:6px;">
-                            ${l.userName} <span style="font-size:0.8rem; padding:2px 6px; border-radius:4px; background-color:var(--col-bg); color:var(--text-muted);">${typeText}</span>
+                            ${l.userName} <span style="font-size:0.8rem; padding:2px 6px; border-radius:4px; background-color:var(--col-bg); color:${isCancel ? 'var(--danger)' : 'var(--text-muted)'};">${isCancel ? '취소 요청' : typeText}</span>
                         </div>
                         <div style="font-size:0.85rem; color:var(--primary); font-weight:bold;">${l.date}</div>
                     </div>
                     <div style="display:flex; gap:6px;">
-                        <button onclick="adminResolveLeave('${l.id}', 'approved')" style="background-color: #10B981; padding: 0.4rem 0.8rem; font-size: 0.8rem;">승인</button>
-                        <button onclick="adminResolveLeave('${l.id}', 'rejected')" style="background-color: var(--danger); padding: 0.4rem 0.8rem; font-size: 0.8rem;">반려</button>
+                        <button onclick="adminResolveLeave('${l.id}', 'approved', '${l.status}')" style="background-color: #10B981; padding: 0.4rem 0.8rem; font-size: 0.8rem;">승인</button>
+                        <button onclick="adminResolveLeave('${l.id}', 'rejected', '${l.status}')" style="background-color: var(--danger); padding: 0.4rem 0.8rem; font-size: 0.8rem;">반려</button>
                     </div>
                 `;
                 pendingListEl.appendChild(li);
@@ -893,7 +918,19 @@ function renderAdminLeaves() {
     }
 }
 
-async function adminResolveLeave(id, newStatus) { db.ref('leaves/' + id).update({ status: newStatus }); }
+async function adminResolveLeave(id, newStatus, currentStatus) { 
+    if (newStatus === 'rejected') {
+        const reason = await customPrompt('반려 사유를 입력하세요:');
+        if (reason === null) return;
+        db.ref('leaves/' + id).update({ status: currentStatus === 'cancel_requested' ? 'approved' : 'rejected', rejectReason: reason });
+    } else {
+        if (currentStatus === 'cancel_requested') {
+            db.ref('leaves/' + id).remove();
+        } else {
+            db.ref('leaves/' + id).update({ status: 'approved', rejectReason: null });
+        }
+    }
+}
 async function adminEditTotalLeave(uid, currentTotal) {
     const newTotal = await customPrompt('연차 개수 설정:', currentTotal);
     if (newTotal) db.ref('users/' + uid).update({ leaveTotal: parseFloat(newTotal) });
@@ -910,13 +947,16 @@ db.ref('leaves').on('value', (s) => {
     isFirstLeavesLoad = false;
 });
 
+function changeMyPageMonth(offset) { currentDateForMyPageCalendar.setMonth(currentDateForMyPageCalendar.getMonth() + offset); renderMyPage(); }
+
 function renderMyPage() {
-    const tasksList = document.getElementById('mypage-tasks'), tripsList = document.getElementById('mypage-trips'), leavesList = document.getElementById('mypage-leaves');
-    if (!tasksList) return; tasksList.innerHTML = ''; tripsList.innerHTML = ''; leavesList.innerHTML = '';
+    const tasksList = document.getElementById('mypage-tasks'), tripsList = document.getElementById('mypage-trips'), leavesList = document.getElementById('mypage-leaves-list');
+    const calGrid = document.getElementById('mypage-calendar-grid');
+    if (!tasksList) return; tasksList.innerHTML = ''; tripsList.innerHTML = ''; if (leavesList) leavesList.innerHTML = ''; if(calGrid) calGrid.innerHTML = '';
     
     if (!auth.currentUser || !currentUserProfile) {
         const loginMsg = '<li style="justify-content: center; color: var(--text-muted); font-size: 0.9rem;">로그인 후 확인 가능합니다.</li>';
-        tasksList.innerHTML = loginMsg; tripsList.innerHTML = loginMsg; leavesList.innerHTML = loginMsg;
+        tasksList.innerHTML = loginMsg; tripsList.innerHTML = loginMsg; if(leavesList) leavesList.innerHTML = loginMsg;
         if(document.getElementById('mypage-profile-card')) document.getElementById('mypage-profile-card').style.display = 'none';
         return;
     }
@@ -939,12 +979,48 @@ function renderMyPage() {
     Object.values(globalTripsData).filter(t => isMatched(t.assignee)).forEach(t => {
         const li = document.createElement('li'); li.innerHTML = `<div style="font-weight:600;">${t.name}</div><div style="font-size:0.8rem;">날짜: ${t.date || '미정'}</div>`; li.onclick = () => openTripModal(t.id, t.name, t.date, t.assignee); tripsList.appendChild(li);
     });
-    Object.values(globalLeavesData).filter(l => l.uid === auth.currentUser.uid).sort((a,b) => b.timestamp - a.timestamp).forEach(l => {
-        const li = document.createElement('li'); 
-        let statusText = l.status === 'approved' ? '승인됨' : (l.status === 'pending' ? '대기중' : (l.status === 'canceled' ? '취소됨' : l.status));
-        li.innerHTML = `<div style="font-weight:600;">${l.date}</div><div style="font-size:0.8rem; color:${l.status==='approved'?'#10B981':(l.status==='canceled'?'var(--text-muted)':'#F59E0B')}">${statusText} (${l.type}일)</div>`; 
-        document.getElementById('mypage-leaves').appendChild(li);
-    });
+    
+    const myLeaves = Object.values(globalLeavesData).filter(l => l.uid === auth.currentUser.uid);
+    
+    if (leavesList) {
+        myLeaves.sort((a,b) => b.timestamp - a.timestamp).forEach(l => {
+            const li = document.createElement('li'); 
+            let statusText = l.status === 'approved' ? '승인됨' : (l.status === 'pending' ? '대기중' : (l.status === 'cancel_requested' ? '취소 대기중' : (l.status === 'rejected' ? '반려됨' : l.status)));
+            let color = l.status === 'approved' ? '#10B981' : (l.status === 'rejected' ? 'var(--danger)' : '#F59E0B');
+            let reasonHtml = l.rejectReason ? `<div style="font-size:0.75rem; color:var(--danger); margin-top:2px;">사유: ${l.rejectReason}</div>` : '';
+            li.innerHTML = `<div><div style="font-weight:600; font-size:0.9rem;">${l.date}</div><div style="font-size:0.75rem; color:${color}">${statusText} (${l.type}일)</div>${reasonHtml}</div>`; 
+            leavesList.appendChild(li);
+        });
+    }
+    
+    if (calGrid) {
+        const year = currentDateForMyPageCalendar.getFullYear(), month = currentDateForMyPageCalendar.getMonth();
+        document.getElementById('mypage-calendar-month-year').textContent = `${year}년 ${month + 1}월`;
+        const firstDay = new Date(year, month, 1).getDay(), daysInMonth = new Date(year, month + 1, 0).getDate();
+        ['일', '월', '화', '수', '목', '금', '토'].forEach((day, index) => {
+            const h = document.createElement('div'); h.className = `calendar-day-header ${index===0?'sun':index===6?'sat':''}`; h.style.padding = '0.4rem'; h.style.fontSize = '0.8rem'; h.textContent = day; calGrid.appendChild(h);
+        });
+        
+        let currentDay = 1, nextMonthDay = 1, today = new Date();
+        for (let i = 0; i < 42; i++) {
+            const cell = document.createElement('div'); cell.className = 'calendar-day mypage-calendar-day';
+            let cellDateStr = '';
+            if (i < firstDay) { cell.classList.add('other-month'); const d = new Date(year, month, 0).getDate() - firstDay + i + 1; cell.innerHTML = `<div class="calendar-date" style="font-size:0.75rem;">${d}</div>`; }
+            else if (currentDay <= daysInMonth) { if (year === today.getFullYear() && month === today.getMonth() && currentDay === today.getDate()) cell.classList.add('today'); cell.innerHTML = `<div class="calendar-date" style="font-size:0.75rem;">${currentDay}</div>`; cellDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(currentDay).padStart(2, '0')}`; currentDay++; }
+            else { cell.classList.add('other-month'); cell.innerHTML = `<div class="calendar-date" style="font-size:0.75rem;">${nextMonthDay}</div>`; nextMonthDay++; }
+            
+            if (cellDateStr) {
+                myLeaves.filter(l => l.date === cellDateStr).forEach(l => {
+                    const el = document.createElement('div'); el.className = 'calendar-task'; el.style.padding = '2px'; el.style.fontSize = '0.7rem'; el.title = l.status;
+                    let color = l.status === 'approved' ? '#10B981' : (l.status === 'rejected' ? 'var(--danger)' : '#F59E0B');
+                    el.style.backgroundColor = color;
+                    el.innerHTML = `<span class="material-symbols-rounded" style="font-size:1em; margin-right:2px;">${l.status === 'approved' ? 'check_circle' : 'pending'}</span>휴가`;
+                    cell.appendChild(el);
+                });
+            }
+            calGrid.appendChild(cell);
+        }
+    }
 }
 
 // ----------------------------------------------------
@@ -1409,6 +1485,7 @@ async function deleteFile(fileId, filePath) {
 db.ref('files').on('value', (s) => {
     const list = document.getElementById('fileList'); list.innerHTML = '';
     const data = s.val(); if (!data) return;
+    for(let key in data) data[key].id = key; // 진짜 DB 키로 강제 동기화
     Object.values(data).sort((a,b) => b.timestamp - a.timestamp).forEach(f => {
         const li = document.createElement('li'); li.innerHTML = `<a href="${f.url}" target="_blank">${f.name}</a> ${f.path ? `<button class="delete-btn" onclick="deleteFile('${f.id}', '${f.path}')">삭제</button>` : ''}`;
         list.appendChild(li);
@@ -1550,4 +1627,10 @@ async function saveNotice() {
     closeNoticeModal();
 }
 async function deleteNotice() { if (await customConfirm('삭제하시겠습니까?')) { db.ref('notices/' + currentNoticeId).remove(); closeNoticeModal(); } }
-db.ref('notices').on('value', (s) => { globalNoticesData = s.val() || {}; renderNotices(); });
+
+// 공지사항 데이터 실시간 동기화
+db.ref('notices').on('value', (s) => { 
+    globalNoticesData = s.val() || {};
+    for(let key in globalNoticesData) globalNoticesData[key].id = key; // 진짜 DB 키로 강제 동기화
+    renderNotices(); 
+});
