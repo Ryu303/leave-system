@@ -945,18 +945,23 @@ async function calculateOptimizedRoute() {
             naver.maps.Service.geocode({
                 query: t.address
             }, function(status, response) {
-                if (status !== naver.maps.Service.Status.OK) {
-                    console.warn('주소 변환 에러 (권한 거부 또는 잘못된 주소):', t.address);
-                    authErrorOccurred = true;
-                    return resolve();
+                let isSuccess = false;
+                if (status === naver.maps.Service.Status.OK) {
+                    var result = response.v2;
+                    var items = result.addresses;
+                    if (items && items.length > 0) {
+                        tripsWithCoords.push({ ...t, lat: parseFloat(items[0].y), lng: parseFloat(items[0].x) });
+                        isSuccess = true;
+                    }
                 }
                 
-                var result = response.v2; // 검색 결과 컨테이너
-                var items = result.addresses; // 검색 결과 배열
-                
-                if (items && items.length > 0) {
-                    // items[0].x (경도), items[0].y (위도) 값을 추출하여 저장
-                    tripsWithCoords.push({ ...t, lat: parseFloat(items[0].y), lng: parseFloat(items[0].x) });
+                // 네이버 401 권한 에러 시 앱이 멈추지 않도록 '임시(가짜) 좌표' 부여하여 강제 진행
+                if (!isSuccess) {
+                    console.warn('주소 변환 통신 거부됨. 임시 좌표로 우회합니다:', t.address);
+                    authErrorOccurred = true;
+                    const dummyLat = 37.5666805 + (Math.random() * 0.04 - 0.02); // 서울 시청 인근 랜덤
+                    const dummyLng = 126.9784147 + (Math.random() * 0.04 - 0.02);
+                    tripsWithCoords.push({ ...t, lat: dummyLat, lng: dummyLng, isDummy: true });
                 }
                 resolve();
             });
@@ -964,14 +969,8 @@ async function calculateOptimizedRoute() {
     }
 
     if (authErrorOccurred) {
-        document.getElementById('tripMap').innerHTML = '<span style="color:var(--danger);">네이버 Geocoding 권한(401) 에러 발생</span>';
         const currentOrigin = window.location.origin;
-        
-        if (currentOrigin === 'file://' || currentOrigin === 'null') {
-            return await customAlert("⚠️ HTML 파일을 단순 더블클릭해서 실행하셨습니다!\n네이버 지도는 보안상 로컬 파일(file://)에서의 작동을 차단합니다.\n반드시 Live Server 등을 통해 접속해주세요.");
-        }
-        
-        return await customAlert(`⚠️ 네이버 서버에서 권한을 거부했습니다 (401 에러).\n\n[해결을 위한 최종 체크]\n1. 콘솔 [Maps] 탭에서 'Geocoding'이 체크되어 있나요?\n2. 콘솔 'Web 서비스 URL'에 아래 주소가 토씨 하나 안 틀리고 똑같이 등록되어 있나요?\n\n👉  ${currentOrigin}\n\n(위 주소를 그대로 복사해서 네이버 콘솔에 추가해 보세요!)`);
+        showToast(`⚠️ 통신 차단됨 (임시 좌표 렌더링)\n네이버 콘솔 'Web 서비스 URL'에 반드시 아래 주소를 추가해주세요:\n👉 ${currentOrigin}`, "warning");
     }
 
     if (tripsWithCoords.length === 0) return await customAlert('입력된 주소들 중 지도에서 찾을 수 있는 정확한 주소가 없습니다.');
@@ -1043,6 +1042,7 @@ async function calculateOptimizedRoute() {
             <div class="route-item-info">
                 <div class="route-item-title">[${trip.date.slice(5)}] ${trip.name}</div>
                 <div class="route-item-address">${trip.address}</div>
+                ${trip.isDummy ? `<div style="color:var(--danger); font-size:0.75rem; font-weight:bold; margin-top:4px;">🚨 권한 차단됨: 임시 위치로 표시</div>` : ''}
                 ${trip.distFromPrev > 0 ? `<div class="route-item-dist">↑ 이전 목적지에서 약 ${trip.distFromPrev.toFixed(1)}km</div>` : ''}
             </div>`;
         listEl.appendChild(li);
