@@ -941,7 +941,7 @@ async function calculateOptimizedRoute() {
     let authErrorOccurred = false;
     
     // 🔥 방금 복사한 카카오 'REST API 키'를 아래 따옴표 안에 붙여넣으세요!
-    const KAKAO_REST_API_KEY = "49567b3deb7ec9afb54384571d730980";
+    const KAKAO_REST_API_KEY = "9159f23f57165f61ac722d066d6f43b5";
 
     if (KAKAO_REST_API_KEY === "여기에_카카오_REST_API_키를_넣어주세요") {
         document.getElementById('tripMap').innerHTML = '<span style="color:var(--danger);">카카오 API 키 입력 필요</span>';
