@@ -936,33 +936,38 @@ async function calculateOptimizedRoute() {
         return;
     }
 
-    // 2. 주소 -> 좌표 변환 (Geocoding - JS 서브모듈 방식 적용)
+    // 2. 주소 -> 좌표 변환 (네이버 버리고 카카오 하이브리드 꼼수 적용)
     const tripsWithCoords = [];
     let authErrorOccurred = false;
     
+    // 🔥 방금 복사한 카카오 'REST API 키'를 아래 따옴표 안에 붙여넣으세요!
+    const KAKAO_REST_API_KEY = "49567b3deb7ec9afb54384571d730980";
+
+    if (KAKAO_REST_API_KEY === "여기에_카카오_REST_API_키를_넣어주세요") {
+        document.getElementById('tripMap').innerHTML = '<span style="color:var(--danger);">카카오 API 키 입력 필요</span>';
+        return await customAlert("script.js 파일의 878번째 줄에 있는 KAKAO_REST_API_KEY 변수에 카카오 REST API 키를 넣어주세요!");
+    }
+
     for (let t of targetTrips) {
-        await new Promise(resolve => {
-            naver.maps.Service.geocode({
-                query: t.address
-            }, function(status, response) {
-                if (status === naver.maps.Service.Status.OK) {
-                    var result = response.v2;
-                    var items = result.addresses;
-                    if (items && items.length > 0) {
-                        tripsWithCoords.push({ ...t, lat: parseFloat(items[0].y), lng: parseFloat(items[0].x) });
-                    }
-                } else {
-                    console.warn('주소 변환 에러 (권한 거부 또는 잘못된 주소):', t.address);
-                    authErrorOccurred = true;
-                }
-                resolve();
+        try {
+            const response = await fetch(`https://dapi.kakao.com/v2/local/search/address.json?query=${encodeURIComponent(t.address)}`, {
+                headers: { 'Authorization': `KakaoAK ${KAKAO_REST_API_KEY}` }
             });
-        });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.documents && data.documents.length > 0) {
+                    tripsWithCoords.push({ ...t, lat: parseFloat(data.documents[0].y), lng: parseFloat(data.documents[0].x) });
+                }
+            } else { authErrorOccurred = true; }
+        } catch (e) {
+            authErrorOccurred = true;
+        }
     }
 
     if (authErrorOccurred) {
         const currentOrigin = window.location.origin;
-        return await customAlert(`⚠️ 네이버 서버에서 권한을 거부했습니다 (401 에러).\n\n[최종 점검]\n1. 네이버 콘솔 'Services > Maps' 메뉴에서 해당 앱에 'Geocoding'이 확실히 체크되어 있나요? (Web Dynamic Map과 별개로 체크해야 함)\n2. 'Web 서비스 URL'에 아래 주소가 정확히 등록되어 있나요?\n\n👉 ${currentOrigin}\n\n3. 방금 설정을 변경하셨다면 최대 10~15분 정도 대기 후 강력 새로고침(Ctrl+F5)을 해주세요.`);
+        return await customAlert(`⚠️ 카카오 서버에서 접근을 차단했습니다.\n\n[해결 방법]\n카카오 디벨로퍼스 > 내 애플리케이션 > 플랫폼 > 'Web' 플랫폼 설정에 아래 주소가 등록되어 있는지 확인해주세요!\n👉 ${currentOrigin}`);
     }
 
     if (tripsWithCoords.length === 0) return await customAlert('입력된 주소들 중 지도에서 찾을 수 있는 정확한 주소가 없습니다.');
