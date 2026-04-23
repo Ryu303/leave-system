@@ -226,7 +226,7 @@ function updateUIPermissions(user, profile) {
     logoutBtn.style.display = isLoggedIn ? 'inline-block' : 'none';
 
     if (isLoggedIn) {
-        userAvatar.src = user.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><rect width="1" height="1" fill="%23E5E7EB"/></svg>';
+        userAvatar.src = user.photoURL || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect width='1' height='1' fill='%23E5E7EB'/%3E%3C/svg%3E";
         userAvatar.style.display = 'block';
         
         if (isApproved) {
@@ -843,7 +843,25 @@ function renderLeaveUI() {
 async function cancelLeave(id) { if (await customConfirm('취소하시겠습니까?')) db.ref('leaves/' + id).update({ status: 'canceled' }); }
 async function deleteLeaveRecord(id) { if (await customConfirm('삭제하시겠습니까?')) db.ref('leaves/' + id).remove(); }
 
-function renderAdminLeaves() { }
+function renderAdminLeaves() {
+    const listEl = document.getElementById('admin-leave-list');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    Object.keys(globalUsersData).forEach(uid => {
+        const u = globalUsersData[uid];
+        if (!u.approved) return;
+        let used = 0;
+        Object.values(globalLeavesData).forEach(l => {
+            if (l.uid === uid && (l.status === 'approved' || l.status === 'pending' || l.status === 'cancel_requested')) used += l.type;
+        });
+        const total = u.leaveTotal || 15;
+        const card = document.createElement('div');
+        card.style.cssText = 'background-color: var(--card-bg); border: 1px solid var(--border-color); padding: 1rem; border-radius: 8px; box-shadow: var(--shadow-sm);';
+        card.innerHTML = `<div style="font-weight: bold; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;"><span>${u.displayName}</span><button onclick="adminEditTotalLeave('${uid}', ${total})" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; background-color: var(--col-bg); color: var(--text-main); border: 1px solid var(--border-color); border-radius: 4px; cursor: pointer;">수정</button></div><div style="font-size: 0.85rem; color: var(--text-muted); display: flex; justify-content: space-between;"><span>총 연차:</span> <span>${total}일</span></div><div style="font-size: 0.85rem; color: var(--text-muted); display: flex; justify-content: space-between;"><span>사용함:</span> <span style="color: var(--danger);">${used.toFixed(1)}일</span></div><div style="font-size: 0.85rem; color: var(--text-muted); display: flex; justify-content: space-between; margin-top: 0.3rem; padding-top: 0.3rem; border-top: 1px dashed var(--border-color); font-weight: bold;"><span>잔여:</span> <span style="color: var(--primary);">${(total - used).toFixed(1)}일</span></div>`;
+        listEl.appendChild(card);
+    });
+}
+
 async function adminResolveLeave(id, newStatus) { db.ref('leaves/' + id).update({ status: newStatus }); }
 async function adminEditTotalLeave(uid, currentTotal) {
     const newTotal = await customPrompt('연차 개수 설정:', currentTotal);
@@ -874,7 +892,7 @@ function renderMyPage() {
 
     if(document.getElementById('mypage-profile-card')) {
         document.getElementById('mypage-profile-card').style.display = 'flex';
-        document.getElementById('mypage-avatar').src = currentUserProfile.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><rect width="1" height="1" fill="%23E5E7EB"/></svg>';
+        document.getElementById('mypage-avatar').src = currentUserProfile.photoURL || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect width='1' height='1' fill='%23E5E7EB'/%3E%3C/svg%3E";
         document.getElementById('mypage-name').textContent = currentUserProfile.displayName;
         document.getElementById('mypage-email').textContent = currentUserProfile.email;
         const deptMap = { 'ceo': '대표', 'health_leader': '헬스케어 (팀장)', 'health_member': '헬스케어 (팀원)', 'marketing': '마케팅부', 'bidding': '입찰사무원', 'unassigned': '부서 미지정' };
@@ -889,6 +907,12 @@ function renderMyPage() {
     });
     Object.values(globalTripsData).filter(t => isMatched(t.assignee)).forEach(t => {
         const li = document.createElement('li'); li.innerHTML = `<div style="font-weight:600;">${t.name}</div><div style="font-size:0.8rem;">날짜: ${t.date || '미정'}</div>`; li.onclick = () => openTripModal(t.id, t.name, t.date, t.assignee); tripsList.appendChild(li);
+    });
+    Object.values(globalLeavesData).filter(l => l.uid === auth.currentUser.uid).sort((a,b) => b.timestamp - a.timestamp).forEach(l => {
+        const li = document.createElement('li'); 
+        let statusText = l.status === 'approved' ? '승인됨' : (l.status === 'pending' ? '대기중' : (l.status === 'canceled' ? '취소됨' : l.status));
+        li.innerHTML = `<div style="font-weight:600;">${l.date}</div><div style="font-size:0.8rem; color:${l.status==='approved'?'#10B981':(l.status==='canceled'?'var(--text-muted)':'#F59E0B')}">${statusText} (${l.type}일)</div>`; 
+        document.getElementById('mypage-leaves').appendChild(li);
     });
 }
 
@@ -937,56 +961,42 @@ async function getRoadRoute(point1, point2) {
     return { distance: getHaversineDistance(point1.lat, point1.lng, point2.lat, point2.lng), path: [new kakao.maps.LatLng(point1.lat, point1.lng), new kakao.maps.LatLng(point2.lat, point2.lng)] };
 }
 
-// K-Means 공간 클러스터링 알고리즘 (K-Means++ 적용으로 거리가 먼 지역들을 정확하게 쪼갬)
-function kMeansClustering(points, k) {
-    if (points.length <= k) return points.map(p => [p]); // 출장지 수보다 팀이 많거나 같으면 하나씩 배정
-    
-    // K-Means++ 초기 중심점 설정 (한 곳에 몰리지 않게 가장 먼 곳들로 강제 배정)
-    let centroids = [];
-    centroids.push({lat: points[Math.floor(Math.random() * points.length)].lat, lng: points[Math.floor(Math.random() * points.length)].lng});
-    
-    while(centroids.length < k) {
-        let dists = points.map(p => {
-            let minD = Infinity;
-            centroids.forEach(c => {
-                let d = getHaversineDistance(p.lat, p.lng, c.lat, c.lng);
-                if (d < minD) minD = d;
-            });
-            return minD * minD; // K-Means++: 먼 곳을 확실히 찢어놓기 위해 거리 제곱 사용
-        });
-        let sumDist = dists.reduce((a, b) => a + b, 0);
-        let rand = Math.random() * sumDist;
-        let sum = 0;
-        for (let i = 0; i < points.length; i++) {
-            sum += dists[i];
-            if (sum >= rand) { centroids.push({lat: points[i].lat, lng: points[i].lng}); break; }
+// 모든 팀과 출장지의 경우의 수를 계산하여 '총 이동 거리가 가장 짧은 환상의 짝꿍'을 찾아내는 함수
+function getDailyBestAssignment(teams, trips) {
+    let bestSum = Infinity;
+    let bestAssignment = [];
+    let N = teams.length;
+    let M = trips.length;
+    let maxAssign = Math.min(N, M);
+    let usedTrips = new Array(M).fill(false);
+
+    function backtrack(teamPtr, currentSum, currentAssign) {
+        if (currentSum >= bestSum) return; // 더 긴 경로가 예상되면 즉시 포기 (계산 속도 극대화)
+        if (currentAssign.length === maxAssign) {
+            bestSum = currentSum;
+            bestAssignment = [...currentAssign];
+            return;
         }
+        if (teamPtr >= N) return;
+
+        let canSkip = (N - teamPtr > maxAssign - currentAssign.length);
+        for (let i = 0; i < M; i++) {
+            if (usedTrips[i]) continue;
+            let team = teams[teamPtr];
+            let trip = trips[i];
+            let dist = team.lastPoint ? getHaversineDistance(team.lastPoint.lat, team.lastPoint.lng, trip.lat, trip.lng) : (1000 - trip.lat);
+            
+            usedTrips[i] = true;
+            currentAssign.push({teamIdx: teamPtr, tripIdx: i});
+            backtrack(teamPtr + 1, currentSum + dist, currentAssign);
+            currentAssign.pop();
+            usedTrips[i] = false;
+        }
+        if (canSkip) backtrack(teamPtr + 1, currentSum, currentAssign);
     }
 
-    let clusters = Array.from({length: k}, () => []);
-    let maxIter = 50, changed = true;
-
-    while(changed && maxIter > 0) {
-        clusters = Array.from({length: k}, () => []);
-        points.forEach(p => {
-            let minDist = Infinity, bestK = 0;
-            centroids.forEach((c, i) => {
-                let dist = getHaversineDistance(p.lat, p.lng, c.lat, c.lng);
-                if(dist < minDist) { minDist = dist; bestK = i; }
-            });
-            clusters[bestK].push(p);
-        });
-
-        changed = false;
-        clusters.forEach((cluster, i) => {
-            if (cluster.length === 0) return;
-            let sumLat = 0, sumLng = 0; cluster.forEach(p => { sumLat += p.lat; sumLng += p.lng; });
-            let newLat = sumLat / cluster.length, newLng = sumLng / cluster.length;
-            if (Math.abs(centroids[i].lat - newLat) > 0.0001 || Math.abs(centroids[i].lng - newLng) > 0.0001) changed = true;
-            centroids[i] = {lat: newLat, lng: newLng};
-        }); maxIter--;
-    }
-    return clusters.filter(c => c.length > 0); // 배정된 곳이 있는 팀만 반환
+    backtrack(0, 0, []);
+    return bestAssignment;
 }
 
 async function calculateOptimizedRoute() {
@@ -1065,119 +1075,79 @@ async function calculateOptimizedRoute() {
     });
     if (!hqCoords) hqCoords = { lat: 37.506543, lng: 126.904543, name: "본점 센터", address: hqAddress, isHQ: true };
 
-    // 3. 전체 출장지를 팀 수만큼 지리적 분할 (K-Means 알고리즘)
-    let clusters = kMeansClustering(tripsWithCoords, teamCount);
+    // 3. 1팀당 1일 1출장 원칙에 따른 연속 스케줄링(Multi-Day Routing) 알고리즘
+    let tripsByDate = {};
+    tripsWithCoords.forEach(t => {
+        if (!tripsByDate[t.date]) tripsByDate[t.date] = [];
+        tripsByDate[t.date].push(t);
+    });
+    const sortedDates = Object.keys(tripsByDate).sort((a,b) => new Date(a) - new Date(b));
+
     const TEAM_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6'];
-    const finalRoutes = [];
+    
+    let teams = Array.from({length: teamCount}, (_, i) => ({
+        teamId: i + 1,
+        color: TEAM_COLORS[i % TEAM_COLORS.length],
+        route: [],
+        path: [],
+        totalDistance: 0,
+        lastPoint: isStartFromHQ ? hqCoords : null // 본점 여정 시작일 경우 첫 포인트 고정
+    }));
 
-    for (let i = 0; i < clusters.length; i++) {
-        let teamTrips = clusters[i];
-        if (teamTrips.length === 0) continue;
+    let skippedTrips = [];
 
-        // 팀 내에서 날짜별로 다시 정렬
-        let tripsByDate = {};
-        teamTrips.forEach(t => {
-            if (!tripsByDate[t.date]) tripsByDate[t.date] = [];
-            tripsByDate[t.date].push(t);
+    // 날짜별로 하루에 1개씩 팀들에게 배정 (전날 도착지 -> 다음날 목적지 최단거리 매칭)
+    for (let date of sortedDates) {
+        let todaysTrips = [...tripsByDate[date]];
+        
+        // 모든 경우의 수를 계산해 가장 짧은 총 이동 거리를 만드는 배정표 도출
+        let bestAssignment = getDailyBestAssignment(teams, todaysTrips);
+        
+        let assignedTripIndices = new Set();
+        bestAssignment.forEach(assign => {
+            let team = teams[assign.teamIdx];
+            let trip = todaysTrips[assign.tripIdx];
+            team.route.push(trip);
+            team.lastPoint = trip; // 다음 날 출발 위치 업데이트
+            assignedTripIndices.add(assign.tripIdx);
         });
-        const sortedDates = Object.keys(tripsByDate).sort((a,b) => new Date(a) - new Date(b));
-
-        let teamOptimizedRoute = [];
-        let fullLinePath = [];
-        let teamTotalDistance = 0;
-        let lastPointForDay = isStartFromHQ ? hqCoords : null; // 전날 마지막 지점 저장용
-
-        for (let date of sortedDates) {
-            let todaysTrips = tripsByDate[date];
-            let unvisited = [...todaysTrips];
-            let dailyRoute = [];
-
-            // 매일 본점 출발이면 매일매일 시작점을 본점으로 리셋
-            if (isStartFromHQ) lastPointForDay = hqCoords;
-
-            // 1단계: 가까운 곳부터 이어가기 (서버 부하 없는 수학적 거리)
-            while(unvisited.length > 0) {
-                if (!lastPointForDay) {
-                    unvisited.sort((a,b) => b.lat - a.lat);
-                    lastPointForDay = unvisited.shift();
-                    dailyRoute.push(lastPointForDay);
-                    continue;
-                }
-                let minIdx = -1, minDist = Infinity;
-                for (let j = 0; j < unvisited.length; j++) {
-                    let d = getHaversineDistance(lastPointForDay.lat, lastPointForDay.lng, unvisited[j].lat, unvisited[j].lng);
-                    if (d < minDist) { minDist = d; minIdx = j; }
-                }
-                let nextTrip = unvisited.splice(minIdx, 1)[0];
-                dailyRoute.push(nextTrip);
-                lastPointForDay = nextTrip;
-            }
-            
-            // 2단계: 2-Opt 최적화 (선 꼬임 방지 알고리즘)
-            let improved = true;
-            let startNodeForOpt = (teamOptimizedRoute.length > 0 && !isStartFromHQ) ? teamOptimizedRoute[teamOptimizedRoute.length - 1] : (isStartFromHQ ? hqCoords : null);
-            
-            while(improved && dailyRoute.length > 2) {
-                improved = false;
-                for (let j = 0; j < dailyRoute.length - 1; j++) {
-                    for (let k = j + 2; k <= dailyRoute.length; k++) {
-                        if (j === 0 && k === dailyRoute.length) continue;
-                        let node_j_m1 = (j === 0) ? startNodeForOpt : dailyRoute[j - 1];
-                        let node_j = dailyRoute[j];
-                        let node_k_m1 = dailyRoute[k - 1];
-                        let node_k = (k === dailyRoute.length) ? null : dailyRoute[k];
-
-                        let dist_before = 0;
-                        if (node_j_m1) dist_before += getHaversineDistance(node_j_m1.lat, node_j_m1.lng, node_j.lat, node_j.lng);
-                        if (node_k) dist_before += getHaversineDistance(node_k_m1.lat, node_k_m1.lng, node_k.lat, node_k.lng);
-
-                        let dist_after = 0;
-                        if (node_j_m1) dist_after += getHaversineDistance(node_j_m1.lat, node_j_m1.lng, node_k_m1.lat, node_k_m1.lng);
-                        if (node_k) dist_after += getHaversineDistance(node_j.lat, node_j.lng, node_k.lat, node_k.lng);
-
-                        if (dist_after < dist_before - 0.001) {
-                            let reversed = dailyRoute.slice(j, k).reverse();
-                            dailyRoute.splice(j, k - j, ...reversed);
-                            improved = true;
-                        }
-                    }
-                }
-            }
-            teamOptimizedRoute.push(...dailyRoute);
-            lastPointForDay = dailyRoute[dailyRoute.length - 1]; // 다음 날 시작점으로 연계
+        
+        // 팀이 부족해서 못 간 출장지가 남았다면 스킵 처리
+        for (let i = 0; i < todaysTrips.length; i++) {
+            if (!assignedTripIndices.has(i)) skippedTrips.push(todaysTrips[i]);
         }
-
-        // 3단계: 순서 확정 후 카카오 내비 API "순차적(await)" 호출 (과부하 완벽 방어)
-        let current = isStartFromHQ ? hqCoords : null;
-        for (let j = 0; j < teamOptimizedRoute.length; j++) {
-            let nextTrip = teamOptimizedRoute[j];
-            if (current) {
-                let roadData = await getRoadRoute(current, nextTrip); 
-                nextTrip.distFromPrev = roadData.distance;
-                teamTotalDistance += roadData.distance;
-                if (roadData.path && roadData.path.length > 0) {
-                    fullLinePath.push(...roadData.path);
-                } else {
-                    // 내비 실패 시 직선 긋기 폴백
-                    fullLinePath.push(new kakao.maps.LatLng(current.lat, current.lng));
-                    fullLinePath.push(new kakao.maps.LatLng(nextTrip.lat, nextTrip.lng));
-                }
-            } else {
-                nextTrip.distFromPrev = 0;
-            }
-            current = nextTrip;
-        }
-
-        finalRoutes.push({
-            teamId: i + 1,
-            color: TEAM_COLORS[i % TEAM_COLORS.length],
-            route: teamOptimizedRoute,
-            path: fullLinePath,
-            totalDistance: teamTotalDistance
-        });
     }
 
-    // 4. 지도 렌더링
+    if (skippedTrips.length > 0) {
+        showToast(`⚠️ [팀 수 부족] 하루 1팀 1곳 원칙에 따라, 배정받지 못한 출장지가 ${skippedTrips.length}곳 있습니다.\n모든 동선을 소화하려면 팀(차량) 수를 늘려주세요.`, "warning");
+    }
+
+    // 4. 팀별로 확정된 스케줄을 따라 카카오 내비 실제 도로 호출 (순차적)
+    for (let team of teams) {
+        if (team.route.length === 0) continue;
+        
+        let current = isStartFromHQ ? hqCoords : null;
+        for (let trip of team.route) {
+            if (current) {
+                let roadData = await getRoadRoute(current, trip); 
+                trip.distFromPrev = roadData.distance;
+                team.totalDistance += roadData.distance;
+                if (roadData.path && roadData.path.length > 0) {
+                    team.path.push(...roadData.path);
+                } else {
+                    team.path.push(new kakao.maps.LatLng(current.lat, current.lng));
+                    team.path.push(new kakao.maps.LatLng(trip.lat, trip.lng));
+                }
+            } else {
+                trip.distFromPrev = 0;
+            }
+            current = trip;
+        }
+    }
+    
+    const finalRoutes = teams.filter(t => t.route.length > 0);
+
+    // 5. 지도 렌더링
     const mapContainer = document.getElementById('tripMap');
     mapContainer.innerHTML = '';
     const initialCenter = finalRoutes.length > 0 && finalRoutes[0].route.length > 0 ? new kakao.maps.LatLng(finalRoutes[0].route[0].lat, finalRoutes[0].route[0].lng) : new kakao.maps.LatLng(37.506543, 126.904543);
@@ -1196,7 +1166,6 @@ async function calculateOptimizedRoute() {
         hqOverlay.setMap(tripMap);
     }
 
-    // 팀 아이디(1, 2, 3...) 순서대로 UI 정렬하여 출력
     finalRoutes.sort((a,b) => a.teamId - b.teamId).forEach(teamData => {
         const color = teamData.color;
         
@@ -1215,14 +1184,13 @@ async function calculateOptimizedRoute() {
             const position = new kakao.maps.LatLng(trip.lat, trip.lng);
             bounds.extend(position);
 
-            // 날짜가 바뀔 때마다 구분선 + 매일 본점(옵션) 추가
             if (currentRenderDate !== trip.date) {
                 const dateHeader = document.createElement('div');
                 dateHeader.style.cssText = 'font-size:0.85rem; color:var(--text-muted); margin: 0.8rem 0 0.2rem 0.5rem; font-weight:bold;';
                 dateHeader.textContent = `🗓 [${trip.date}]`;
                 listEl.appendChild(dateHeader);
                 
-                if (isStartFromHQ) {
+                if (isStartFromHQ && tripNumber === 1) { // 첫날의 맨 처음에만 본점 표시
                     const startLi = document.createElement('div');
                     startLi.className = 'route-item';
                     startLi.innerHTML = `<div class="route-item-number" style="background-color: #1F2937; width:auto; padding:0 8px; border-radius:12px; font-size: 0.8rem;">출발</div>
@@ -1352,7 +1320,7 @@ function renderMembersDirectory() {
         const u = globalUsersData[uid]; if (!u.approved) return;
         const card = document.createElement('div'); card.className = 'org-card' + (isAdmin ? ' draggable' : '');
         if (isAdmin) { card.draggable = true; card.ondragstart = (e) => e.dataTransfer.setData("uid", uid); }
-        card.innerHTML = `<img src="${u.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><rect width="1" height="1" fill="%23E5E7EB"/></svg>'}" style="width: 54px; height: 54px; border-radius: 50%; object-fit: cover;"><div style="flex:1;font-weight:800;font-size:1.1rem;">${u.displayName}</div>${uid !== auth.currentUser.uid ? `<button onclick="openPrivateChat('${uid}', '${u.displayName}')" class="delete-btn" style="background:var(--col-bg);color:var(--text-muted);"><span class="material-symbols-rounded">chat</span></button>` : ''}`;
+        card.innerHTML = `<img src="${u.photoURL || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect width='1' height='1' fill='%23E5E7EB'/%3E%3C/svg%3E"}" style="width: 54px; height: 54px; border-radius: 50%; object-fit: cover;"><div style="flex:1;font-weight:800;font-size:1.1rem;">${u.displayName}</div>${uid !== auth.currentUser.uid ? `<button onclick="openPrivateChat('${uid}', '${u.displayName}')" class="delete-btn" style="background:var(--col-bg);color:var(--text-muted);"><span class="material-symbols-rounded">chat</span></button>` : ''}`;
         const target = document.getElementById('list-' + (u.department || 'unassigned')); if (target) target.appendChild(card);
     });
 }
@@ -1413,7 +1381,7 @@ function renderChatList() {
         if (uid === auth.currentUser.uid) return;
         const u = globalUsersData[uid]; if (!u.approved) return;
         const item = document.createElement('div'); item.className = 'chat-list-item'; item.onclick = () => openPrivateChat(uid, u.displayName);
-        item.innerHTML = `<img src="${u.photoURL || 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><rect width="1" height="1" fill="%23E5E7EB"/></svg>'}" style="width:48px;height:48px;border-radius:18px;margin-right:12px; object-fit: cover;"><div style="flex:1;font-weight:600;">${u.displayName}</div>`; listBody.appendChild(item);
+        item.innerHTML = `<img src="${u.photoURL || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect width='1' height='1' fill='%23E5E7EB'/%3E%3C/svg%3E"}" style="width:48px;height:48px;border-radius:18px;margin-right:12px; object-fit: cover;"><div style="flex:1;font-weight:600;">${u.displayName}</div>`; listBody.appendChild(item);
     });
 }
 function handleChatEnter(event) { if (event.key === 'Enter') { event.preventDefault(); sendChatMessage(); } }
