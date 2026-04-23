@@ -949,12 +949,12 @@ select option {
 .chat-footer input:focus { border-color: var(--primary); }
 .chat-footer button { width: 40px; height: 40px; border-radius: 50%; padding: 0; display: flex; justify-content: center; align-items: center; }
 
-/* 1:1 채팅창은 화면이 넓을 때 그룹채팅창 옆에 위치 */
-.private-chat-window { right: 380px; }
+.chat-list-item { display: flex; align-items: center; padding: 1.2rem 1rem; border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background-color 0.2s; }
+.chat-list-item:hover { background-color: rgba(99, 102, 241, 0.05); }
+.chat-list-item:last-child { border-bottom: none; }
 
 @media (max-width: 768px) { 
     .chat-window { width: calc(100vw - 40px); bottom: 80px; right: 20px; } 
-    .private-chat-window { right: 20px; z-index: 1000; }
 }
 
 /* ==================== 

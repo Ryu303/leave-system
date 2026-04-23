@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#4F46E5">
     <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="icon-192x192.png">
     <title>FaWW Workspace</title>
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css" />
     <link rel="stylesheet" href="style.css">
@@ -27,6 +26,9 @@
     
     <!-- Material Symbols (모던 아이콘) 추가 -->
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+
+    <!-- 네이버 지도 API (JS 서브모듈 방식) -->
+    <script type="text/javascript" src="https://openapi.map.naver.com/openapi/v3/maps.js?ncpClientId=6pjpjrzqb7&submodules=geocoder"></script>
 </head>
 <body>
     <div class="header">
@@ -225,6 +227,23 @@
                     <button id="addTripBtn" onclick="openTripModal()" style="display:flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:1.2em;">add</span> 새 출장 추가</button>
                 </div>
             </div>
+            
+            <!-- 스마트 출장 동선 지도 섹션 -->
+            <div style="background-color: var(--col-bg); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem; border: 1px solid var(--border-color);">
+                <h3 style="margin-top: 0; margin-bottom: 1rem; color: var(--primary); display: flex; align-items: center; gap: 6px;"><span class="material-symbols-rounded">route</span> 스마트 동선 최적화 (지도)</h3>
+                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;">
+                    <input type="text" id="mapAssignee" placeholder="담당자 이름 (예: 홍길동)" class="search-input" style="flex: 1; min-width: 120px;">
+                    <input type="text" id="mapStartDate" class="date-select-btn" placeholder="시작일" style="flex: 1; min-width: 100px; padding: 0.6rem;">
+                    <span style="align-self: center; font-weight: bold; color: var(--text-muted);">~</span>
+                    <input type="text" id="mapEndDate" class="date-select-btn" placeholder="종료일" style="flex: 1; min-width: 100px; padding: 0.6rem;">
+                    <button onclick="calculateOptimizedRoute()" style="background-color: #8B5CF6;">동선 그리기</button>
+                </div>
+                <div class="map-container-grid">
+                    <div id="tripMap" class="trip-map-area"><span style="color:var(--text-muted);">조건을 입력하고 동선 그리기를 누르세요.<br>(네이버 지도 Client ID 연동 필요)</span></div>
+                    <div id="tripRouteList" class="trip-route-list"></div>
+                </div>
+            </div>
+
             <div id="trip-list" class="trip-grid"></div>
         </div>
         </div>
@@ -448,6 +467,36 @@
         </div>
     </div>
 
+    <!-- 개인정보 수정 모달 -->
+    <div id="profileModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 style="margin: 0; display:flex; align-items:center;"><span class="material-symbols-rounded" style="margin-right:6px;">manage_accounts</span> 개인정보 수정</h3>
+                <button class="close-btn" onclick="closeProfileModal()" title="닫기"><span class="material-symbols-rounded">close</span></button>
+            </div>
+            <div class="modal-body" style="display: flex; flex-direction: column; gap: 1rem; padding-top: 0.5rem;">
+                <div>
+                    <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">이름 (표시명)</label>
+                    <input type="text" id="profileNameInput" class="search-input" style="width: 100%; box-sizing: border-box; padding: 0.6rem;">
+                </div>
+                <div>
+                    <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 0.4rem;">소속 부서</label>
+                    <select id="profileDeptInput" class="search-input" style="width: 100%; box-sizing: border-box; padding: 0.6rem;">
+                        <option value="unassigned">미지정</option>
+                        <option value="ceo">대표</option>
+                        <option value="health_leader">헬스케어 (팀장)</option>
+                        <option value="health_member">헬스케어 (팀원)</option>
+                        <option value="marketing">마케팅부</option>
+                        <option value="bidding">입찰사무원</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer" style="margin-top: 1.5rem;">
+                <button onclick="saveProfile()" style="width: 100%;">저장하기</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 같은 날짜 출장 목록 선택 모달 -->
     <div id="tripGroupModal" class="modal-overlay" style="display: none;">
         <div class="modal-content" style="max-width: 450px;">
@@ -502,14 +551,29 @@
     <div id="toast-container" class="toast-container"></div>
     
     <!-- 실시간 사내 채팅 (미니 메신저) -->
-    <button id="chat-toggle-btn" class="chat-toggle-btn" onclick="toggleChatWindow()" title="사내 메신저">
+    <button id="chat-toggle-btn" class="chat-toggle-btn" onclick="toggleChatListWindow()" title="사내 메신저">
         <span class="material-symbols-rounded">chat</span>
     </button>
 
-    <div id="chat-window" class="chat-window">
+    <!-- 1. 채팅 목록 창 (신규 추가) -->
+    <div id="chat-list-window" class="chat-window" style="display: none;">
         <div class="chat-header">
-            <div style="display:flex; align-items:center; gap:8px;"><span class="material-symbols-rounded">forum</span><span style="font-weight:600;">사내 단체 채팅방</span></div>
-            <button class="close-btn" onclick="toggleChatWindow()"><span class="material-symbols-rounded">close</span></button>
+            <div style="display:flex; align-items:center; gap:8px;"><span class="material-symbols-rounded">forum</span><span style="font-weight:600;">채팅 목록</span></div>
+            <button class="close-btn" onclick="document.getElementById('chat-list-window').style.display='none'"><span class="material-symbols-rounded">close</span></button>
+        </div>
+        <div class="chat-body" id="chat-list-body" style="padding: 0; display: flex; flex-direction: column;">
+            <!-- 자바스크립트로 리스트가 생성됩니다. -->
+        </div>
+    </div>
+
+    <!-- 2. 단체 채팅창 -->
+    <div id="chat-window" class="chat-window" style="display: none;">
+        <div class="chat-header">
+            <div style="display:flex; align-items:center; gap:4px;">
+                <button class="close-btn" onclick="backToChatList()" title="목록으로" style="margin-right:4px;"><span class="material-symbols-rounded">arrow_back</span></button>
+                <span class="material-symbols-rounded" style="margin-right:2px;">groups</span><span style="font-weight:600;">단체 채팅방</span>
+            </div>
+            <button class="close-btn" onclick="document.getElementById('chat-window').style.display='none'"><span class="material-symbols-rounded">close</span></button>
         </div>
         <div class="chat-body" id="chat-messages"></div>
         <div class="chat-footer">
@@ -518,10 +582,13 @@
         </div>
     </div>
     
-    <!-- 1:1 개인 채팅창 -->
-    <div id="private-chat-window" class="chat-window private-chat-window" style="display: none;">
+    <!-- 3. 1:1 개인 채팅창 -->
+    <div id="private-chat-window" class="chat-window" style="display: none;">
         <div class="chat-header">
-            <div style="display:flex; align-items:center; gap:8px;"><span class="material-symbols-rounded">person</span><span id="private-chat-title" style="font-weight:600;">1:1 채팅</span></div>
+            <div style="display:flex; align-items:center; gap:4px;">
+                <button class="close-btn" onclick="backToChatList()" title="목록으로" style="margin-right:4px;"><span class="material-symbols-rounded">arrow_back</span></button>
+                <span class="material-symbols-rounded" style="margin-right:2px;">person</span><span id="private-chat-title" style="font-weight:600;">1:1 채팅</span>
+            </div>
             <button class="close-btn" onclick="closePrivateChat()"><span class="material-symbols-rounded">close</span></button>
         </div>
         <div class="chat-body" id="private-chat-messages"></div>
@@ -533,11 +600,13 @@
 
     <script src="script.js"></script>
     <script>
+        // 악성 캐시 및 좀비 서비스 워커 완전 박멸
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js')
-                    .then(reg => console.log('Service Worker 등록 성공!', reg.scope))
-                    .catch(err => console.log('Service Worker 등록 실패:', err));
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) { registration.unregister(); }
+            });
+            caches.keys().then(function(names) {
+                for (let name of names) caches.delete(name);
             });
         }
     </script>
