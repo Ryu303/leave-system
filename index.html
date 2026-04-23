@@ -238,6 +238,11 @@
                     <span style="align-self: center; font-weight: bold; color: var(--text-muted);">~</span>
                     <input type="text" id="mapEndDate" class="date-select-btn" placeholder="종료일" style="flex: 1; min-width: 80px; padding: 0.6rem;">
                     <input type="number" id="mapTeamCount" class="search-input" placeholder="팀 수" min="1" max="10" value="1" style="width: 70px; padding: 0.6rem;" title="해당 일자에 동시 운영할 팀(차량) 수">
+                    <select id="mapRoutingStrategy" class="search-input" style="padding: 0.6rem; min-width: 140px;" title="동선 최적화 방식 선택">
+                        <option value="total_distance">1. 총 거리 우선 (전체 최적화)</option>
+                        <option value="sequential">2. 전날 출장지 기준 (가까운 곳 우선)</option>
+                        <option value="time">3. 실시간 교통 상황 기준 (최단 시간)</option>
+                    </select>
                     <label style="display:flex; align-items:center; gap:4px; font-size:0.85rem; color:var(--text-main); font-weight:600; margin-right: 0.5rem; cursor:pointer;">
                         <input type="checkbox" id="mapStartFromHQ" checked style="width:16px; height:16px; cursor:pointer;"> 본점에서 여정 시작
                     </label>
@@ -317,6 +322,12 @@
             
             <hr style="border: 0; border-top: 2px dashed var(--border-color); margin: 2rem 0;">
             
+            <!-- 휴가 결재 대기 목록 (신규 추가) -->
+            <div style="margin-bottom: 2rem;">
+                <h3 style="font-size: 1.1rem; color: #F59E0B; margin: 0 0 1rem 0; display:flex; align-items:center;"><span class="material-symbols-rounded" style="font-size:1.2em; margin-right:6px;">fact_check</span> 휴가 결재 대기 목록</h3>
+                <ul id="admin-pending-leaves-list" class="user-list"></ul>
+            </div>
+
             <!-- 팀원 연차 현황 (관리자 전용) -->
             <div>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
