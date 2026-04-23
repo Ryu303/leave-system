@@ -945,23 +945,15 @@ async function calculateOptimizedRoute() {
             naver.maps.Service.geocode({
                 query: t.address
             }, function(status, response) {
-                let isSuccess = false;
                 if (status === naver.maps.Service.Status.OK) {
                     var result = response.v2;
                     var items = result.addresses;
                     if (items && items.length > 0) {
                         tripsWithCoords.push({ ...t, lat: parseFloat(items[0].y), lng: parseFloat(items[0].x) });
-                        isSuccess = true;
                     }
-                }
-                
-                // 네이버 401 권한 에러 시 앱이 멈추지 않도록 '임시(가짜) 좌표' 부여하여 강제 진행
-                if (!isSuccess) {
-                    console.warn('주소 변환 통신 거부됨. 임시 좌표로 우회합니다:', t.address);
+                } else {
+                    console.warn('주소 변환 에러 (권한 거부 또는 잘못된 주소):', t.address);
                     authErrorOccurred = true;
-                    const dummyLat = 37.5666805 + (Math.random() * 0.04 - 0.02); // 서울 시청 인근 랜덤
-                    const dummyLng = 126.9784147 + (Math.random() * 0.04 - 0.02);
-                    tripsWithCoords.push({ ...t, lat: dummyLat, lng: dummyLng, isDummy: true });
                 }
                 resolve();
             });
@@ -970,7 +962,7 @@ async function calculateOptimizedRoute() {
 
     if (authErrorOccurred) {
         const currentOrigin = window.location.origin;
-        showToast(`⚠️ 통신 차단됨 (임시 좌표 렌더링)\n네이버 콘솔 'Web 서비스 URL'에 반드시 아래 주소를 추가해주세요:\n👉 ${currentOrigin}`, "warning");
+        return await customAlert(`⚠️ 네이버 서버에서 권한을 거부했습니다 (401 에러).\n\n[최종 점검]\n1. 네이버 콘솔 'Services > Maps' 메뉴에서 해당 앱에 'Geocoding'이 확실히 체크되어 있나요? (Web Dynamic Map과 별개로 체크해야 함)\n2. 'Web 서비스 URL'에 아래 주소가 정확히 등록되어 있나요?\n\n👉 ${currentOrigin}\n\n3. 방금 설정을 변경하셨다면 최대 10~15분 정도 대기 후 강력 새로고침(Ctrl+F5)을 해주세요.`);
     }
 
     if (tripsWithCoords.length === 0) return await customAlert('입력된 주소들 중 지도에서 찾을 수 있는 정확한 주소가 없습니다.');
@@ -1042,7 +1034,6 @@ async function calculateOptimizedRoute() {
             <div class="route-item-info">
                 <div class="route-item-title">[${trip.date.slice(5)}] ${trip.name}</div>
                 <div class="route-item-address">${trip.address}</div>
-                ${trip.isDummy ? `<div style="color:var(--danger); font-size:0.75rem; font-weight:bold; margin-top:4px;">🚨 권한 차단됨: 임시 위치로 표시</div>` : ''}
                 ${trip.distFromPrev > 0 ? `<div class="route-item-dist">↑ 이전 목적지에서 약 ${trip.distFromPrev.toFixed(1)}km</div>` : ''}
             </div>`;
         listEl.appendChild(li);
