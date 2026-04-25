@@ -1,0 +1,570 @@
+// map.js
+// ----------------------------------------------------
+// 출장 관리 & 스마트 동선 최적화 (지도 및 TSP 알고리즘)
+// ----------------------------------------------------
+let currentTripId = null;
+function openTripModal(id = null, name = '', date = '', assignee = '', contact = '', address = '', scheduleUrl = '', schedulePath = '', qrUrl = '', qrPath = '', roomType = 'single', bookedHotel = '') {
+    currentTripId = id; document.getElementById('tripModalTitle').textContent = id ? '출장 수정' : '새 출장';
+    document.getElementById('tripName').value = name; document.getElementById('tripDate').value = date;
+    document.getElementById('tripAssignee').value = assignee; document.getElementById('tripContact').value = contact;
+    document.getElementById('tripAddress').value = address;
+    
+    // 숙소 정보 초기화 및 렌더링
+    document.getElementById('tripRoomType').value = roomType || 'single';
+    document.getElementById('tripBookedHotel').value = bookedHotel || '';
+    const resultsContainer = document.getElementById('accommodationResults');
+    if (bookedHotel) {
+        resultsContainer.style.display = 'flex';
+        resultsContainer.innerHTML = `<div style="padding:0.8rem; background-color:#10B98115; color:#10B981; border-radius:6px; font-weight:bold; font-size:0.85rem; text-align:center; display:flex; justify-content:space-between; align-items:center;"><span><span class="material-symbols-rounded" style="vertical-align:middle; font-size:1.2em;">check_circle</span> 예약 숙소: ${bookedHotel}</span><button onclick="cancelAccommodation()" style="background:transparent; color:var(--danger); border:1px solid var(--danger); padding:0.2rem 0.5rem; font-size:0.75rem;">예약 취소</button></div>`;
+    } else {
+        resultsContainer.style.display = 'none';
+        resultsContainer.innerHTML = '';
+    }
+
+    document.getElementById('tripScheduleFile').dataset.existingUrl = scheduleUrl;
+    document.getElementById('tripScheduleFile').dataset.existingPath = schedulePath;
+    document.getElementById('currentScheduleFile').textContent = scheduleUrl ? `첨부됨: ${schedulePath.split('_').pop()}` : '';
+    document.getElementById('tripModal').style.display = 'flex';
+}
+
+async function searchAccommodation() {
+    const address = document.getElementById('tripAddress').value.trim();
+    if (!address) return await customAlert('출장지 주소를 먼저 입력해주세요!\n입력된 주소를 바탕으로 근처 숙소를 찾습니다.');
+    
+    const roomType = document.getElementById('tripRoomType').value;
+    const typeLabel = roomType === 'single' ? '1인실' : '트윈룸';
+    const resultsContainer = document.getElementById('accommodationResults');
+    
+    resultsContainer.style.display = 'flex';
+    resultsContainer.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:0.85rem; padding: 1rem 0;">카카오 지도 API를 통해 주변 실제 숙소를 검색 중입니다...⏳</div>';
+    
+    if (typeof kakao === 'undefined' || !kakao.maps || !kakao.maps.services) {
+        resultsContainer.innerHTML = '<div style="text-align:center; color:var(--danger); font-size:0.85rem; padding: 1rem 0;">지도 API가 로드되지 않았습니다.</div>';
+        return;
+    }
+
+    // 1. 입력된 주소를 좌표로 변환
+    const geocoder = new kakao.maps.services.Geocoder();
+    geocoder.addressSearch(address, function(result, status) {
+        if (status === kakao.maps.services.Status.OK) {
+            const coords = new kakao.maps.LatLng(result[0].y, result[0].x);
+            const ps = new kakao.maps.services.Places();
+            
+            // 2. 좌표 반경 5km 이내 숙박업소(AD5) 검색 (가까운 순 정렬)
+            ps.categorySearch('AD5', function(places, status, pagination) {
+                if (status === kakao.maps.services.Status.OK) {
+                    let html = `<div style="font-size:0.85rem; font-weight:bold; color:var(--text-main); margin-bottom: 0.3rem;">근처 실제 숙소 추천 (${typeLabel} 기준)</div>`;
+                    const topPlaces = places.slice(0, 5); // 상위 5개만 표시
+                    topPlaces.forEach(place => {
+                        const distText = place.distance ? `출장지에서 ${place.distance}m` : '';
+                        const safeName = place.place_name.replace(/'/g, "\\'");
+                        html += `<div style="display:flex; justify-content:space-between; align-items:center; background:var(--card-bg); padding:0.8rem; border-radius:6px; border:1px solid var(--border-color); margin-bottom:0.5rem;"><div><div style="font-weight:bold; font-size:0.9rem; color:#E63946;">${place.place_name}</div><div style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">${distText} | <a href="${place.place_url}" target="_blank" style="color:var(--primary); text-decoration:underline;">카카오맵 상세정보</a></div></div><button onclick="bookAccommodation('${safeName}')" style="background-color:#E63946; padding:0.4rem 0.8rem; font-size:0.8rem;">선택 및 예약</button></div>`;
+                    });
+                    
+                    const regionName = address.split(' ').slice(0, 2).join(' '); // "부산 해운대구" 형태로 지역명 추출
+                    html += `<button onclick="window.open('https://www.goodchoice.kr/product/result?keyword=${encodeURIComponent(regionName)}', '_blank')" style="width: 100%; margin-top: 0.5rem; background-color: var(--col-bg); color: var(--text-main); border: 1px dashed var(--danger); padding: 0.8rem; display:flex; align-items:center; justify-content:center; gap:4px; font-weight:600; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#FEE2E2'" onmouseout="this.style.backgroundColor='var(--col-bg)'"><span class="material-symbols-rounded" style="color:var(--danger);">sell</span> 여기어때에서 '${regionName}' 전체 최저가 비교하기</button>`;
+                    
+                    resultsContainer.innerHTML = html;
+                } else {
+                    resultsContainer.innerHTML = '<div style="text-align:center; color:var(--text-muted); font-size:0.85rem; padding: 1rem 0;">주변(5km 이내)에 검색된 숙소가 없습니다.</div>';
+                }
+            }, { location: coords, radius: 5000, sort: kakao.maps.services.SortBy.DISTANCE });
+        } else {
+             resultsContainer.innerHTML = '<div style="text-align:center; color:var(--danger); font-size:0.85rem; padding: 1rem 0;">주소를 정확히 찾을 수 없어 숙소 검색에 실패했습니다.</div>';
+        }
+    });
+}
+
+async function bookAccommodation(hotelName) {
+    if(await customConfirm(`'${hotelName}'을(를) 출장 숙소로 선택하시겠습니까?\n\n(확인 시 [여기어때] 예약 사이트로 이동하며, 출장 기록에 숙소 이름이 저장됩니다.)`)) {
+        document.getElementById('tripBookedHotel').value = hotelName;
+        document.getElementById('accommodationResults').innerHTML = `<div style="padding:0.8rem; background-color:#10B98115; color:#10B981; border-radius:6px; font-weight:bold; font-size:0.85rem; text-align:center; display:flex; justify-content:space-between; align-items:center;"><span><span class="material-symbols-rounded" style="vertical-align:middle; font-size:1.2em;">check_circle</span> 예약 숙소: ${hotelName}</span><button onclick="cancelAccommodation()" style="background:transparent; color:var(--danger); border:1px solid var(--danger); padding:0.2rem 0.5rem; font-size:0.75rem;">예약 취소</button></div>`;
+        
+        // 여기어때 웹 통합 검색 결과 창 열기
+        const yanoljaUrl = `https://www.goodchoice.kr/product/result?keyword=${encodeURIComponent(hotelName)}`;
+        window.open(yanoljaUrl, '_blank');
+        
+        showToast('숙소가 선택되었습니다. 모달 하단의 [저장]을 눌러 확정하세요.', 'info');
+    }
+}
+
+function cancelAccommodation() {
+    document.getElementById('tripBookedHotel').value = '';
+    document.getElementById('accommodationResults').innerHTML = '';
+    document.getElementById('accommodationResults').style.display = 'none';
+    showToast('숙소 예약이 취소되었습니다.', 'info');
+}
+
+function closeTripModal() { document.getElementById('tripModal').style.display = 'none'; currentTripId = null; }
+
+async function saveTrip() {
+    if (!(await checkAuth('승인된 사용자만 저장할 수 있습니다.'))) return;
+    const name = document.getElementById('tripName').value.trim();
+    if (!name) return await customAlert('출장명을 입력해주세요.');
+
+    const saveBtn = document.querySelector('#tripModal .modal-footer button');
+    saveBtn.disabled = true; saveBtn.textContent = '저장 중...';
+
+    try {
+        const tripData = {
+            name: name, date: document.getElementById('tripDate').value, assignee: document.getElementById('tripAssignee').value.trim(),
+            contact: document.getElementById('tripContact').value.trim(), address: document.getElementById('tripAddress').value.trim(),
+            roomType: document.getElementById('tripRoomType').value, bookedHotel: document.getElementById('tripBookedHotel').value,
+            scheduleUrl: document.getElementById('tripScheduleFile').dataset.existingUrl || '', schedulePath: document.getElementById('tripScheduleFile').dataset.existingPath || '',
+            qrUrl: '', qrPath: ''
+        };
+        if (currentTripId) await db.ref('businessTrips/' + currentTripId).update(tripData);
+        else { tripData.timestamp = Date.now(); const ref = db.ref('businessTrips').push(); tripData.id = ref.key; await ref.set(tripData); }
+        closeTripModal();
+    } catch (e) { 
+        await customAlert("저장 실패: " + e.message); 
+    } finally { 
+        saveBtn.disabled = false; saveBtn.textContent = '저장'; 
+    }
+}
+
+async function deleteTrip(id) {
+    if (!(await checkAuth('승인된 사용자만 삭제할 수 있습니다.'))) return;
+    if (!await customConfirm('출장을 삭제하시겠습니까?')) return;
+    
+    try {
+        const trip = globalTripsData[id];
+        if (trip && trip.schedulePath) storage.ref(trip.schedulePath).delete().catch(()=>{});
+        
+        await db.ref('businessTrips/' + id).remove();
+        showToast('출장이 성공적으로 삭제되었습니다.', 'info');
+    } catch (error) {
+        await customAlert('❌ 삭제 실패: ' + error.message + '\n\n(파이어베이스 권한 또는 네트워크 문제일 수 있습니다)');
+    }
+}
+
+document.getElementById('tripModal').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'BUTTON') { e.preventDefault(); saveTrip(); }
+});
+
+db.ref('businessTrips').on('value', (s) => {
+    globalTripsData = s.val() || {}; 
+    for(let key in globalTripsData) globalTripsData[key].id = key; // 진짜 DB 키로 강제 동기화
+    renderTasks(); if(typeof renderMyPage === 'function') renderMyPage();
+    const list = document.getElementById('trip-list'); if (!list) return; list.innerHTML = '';
+    Object.values(globalTripsData).sort((a,b) => (a.date ? new Date(a.date).getTime() : Infinity) - (b.date ? new Date(b.date).getTime() : Infinity)).forEach(trip => {
+        const div = document.createElement('div'); div.className = 'trip-card';
+        if (trip.date && new Date(trip.date).setHours(0,0,0,0) < new Date().setHours(0,0,0,0)) div.classList.add('past-trip');
+        div.innerHTML = `<div class="trip-header"><div style="display:flex; align-items:flex-start; gap:10px;"><input type="checkbox" class="trip-checkbox" value="${trip.id}" style="width:18px; height:18px; margin-top:2px; cursor:pointer;" title="동선 최적화 선택"><div style="flex:1;"><div class="trip-title">${trip.name}</div><div class="trip-date">${trip.date}</div></div></div><div style="display:flex;gap:0.3rem;"><button class="delete-btn edit" style="padding:0.3rem;background:var(--col-bg);color:var(--text-main)"><span class="material-symbols-rounded">edit</span></button><button class="delete-btn del" style="padding:0.3rem"><span class="material-symbols-rounded">close</span></button></div></div><div class="trip-info-row">${trip.address}${trip.bookedHotel ? `<div style="color:#E63946; font-size:0.8rem; font-weight:bold; margin-top:4px;"><span class="material-symbols-rounded" style="font-size:1.1em; vertical-align:middle;">hotel</span> 예약 숙소: ${trip.bookedHotel}</div>` : ''}</div>`;
+        
+        div.onclick = (e) => {
+            if (e.target.closest('.edit') || e.target.closest('.del')) return;
+            if (e.target.tagName === 'INPUT' && e.target.type === 'checkbox') return;
+            const checkbox = div.querySelector('.trip-checkbox');
+            if (checkbox) checkbox.checked = !checkbox.checked;
+        };
+        
+        div.querySelector('.edit').onclick = () => openTripModal(trip.id, trip.name, trip.date, trip.assignee, trip.contact, trip.address, trip.scheduleUrl, trip.schedulePath, trip.qrUrl || '', trip.qrPath || '', trip.roomType, trip.bookedHotel);
+        div.querySelector('.del').onclick = () => deleteTrip(trip.id);
+        list.appendChild(div);
+    });
+});
+
+let tripMap = null;
+let mapPolylines = [];
+let mapMarkers = [];
+
+function getHaversineDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // 지구 반지름 (km)
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+// 카카오 내비 API를 활용한 실제 도로 경로 및 거리 탐색 함수
+async function getRoadRoute(point1, point2) {
+    const KAKAO_REST_API_KEY = "9159f23f57165f61ac722d066d6f43b5";
+    const url = `https://apis-navi.kakaomobility.com/v1/directions?origin=${point1.lng},${point1.lat}&destination=${point2.lng},${point2.lat}`;
+    try {
+        const res = await fetch(url, { headers: { 'Authorization': `KakaoAK ${KAKAO_REST_API_KEY}` } });
+        if (res.ok) {
+            const data = await res.json();
+            if (data.routes && data.routes.length > 0) {
+                const route = data.routes[0];
+                const distance = route.summary.distance / 1000; // 미터를 km로 변환
+                const duration = route.summary.duration; // 초 단위 운전 소요 시간
+                const path = [];
+                route.sections.forEach(section => {
+                    section.roads.forEach(road => {
+                        for (let i = 0; i < road.vertexes.length; i += 2) {
+                            path.push(new kakao.maps.LatLng(road.vertexes[i+1], road.vertexes[i]));
+                        }
+                    });
+                });
+                return { distance, duration, path };
+            }
+        }
+    } catch (e) {
+        console.warn("도로 경로 조회 실패. 직선거리로 대체합니다.", e);
+    }
+    // 내비 API 실패 시 기존 직선거리 로직으로 자동 폴백(안전장치)
+    let fallbackDist = getHaversineDistance(point1.lat, point1.lng, point2.lat, point2.lng);
+    return { distance: fallbackDist, duration: fallbackDist * 120, path: [new kakao.maps.LatLng(point1.lat, point1.lng), new kakao.maps.LatLng(point2.lat, point2.lng)] };
+}
+
+// 모든 팀과 출장지의 경우의 수를 계산하여 '총 이동 거리가 가장 짧은 환상의 짝꿍'을 찾아내는 함수
+function getDailyBestAssignment(teams, trips) {
+    let bestSum = Infinity;
+    let bestAssignment = [];
+    let N = teams.length;
+    let M = trips.length;
+    let maxAssign = Math.min(N, M);
+    let usedTrips = new Array(M).fill(false);
+
+    function backtrack(teamPtr, currentSum, currentAssign) {
+        if (currentSum >= bestSum) return; // 더 긴 경로가 예상되면 즉시 포기 (계산 속도 극대화)
+        if (currentAssign.length === maxAssign) {
+            bestSum = currentSum;
+            bestAssignment = [...currentAssign];
+            return;
+        }
+        if (teamPtr >= N) return;
+
+        let canSkip = (N - teamPtr > maxAssign - currentAssign.length);
+        for (let i = 0; i < M; i++) {
+            if (usedTrips[i]) continue;
+            let team = teams[teamPtr];
+            let trip = trips[i];
+            let dist = team.lastPoint ? getHaversineDistance(team.lastPoint.lat, team.lastPoint.lng, trip.lat, trip.lng) : (1000 - trip.lat);
+            
+            usedTrips[i] = true;
+            currentAssign.push({teamIdx: teamPtr, tripIdx: i});
+            backtrack(teamPtr + 1, currentSum + dist, currentAssign);
+            currentAssign.pop();
+            usedTrips[i] = false;
+        }
+        if (canSkip) backtrack(teamPtr + 1, currentSum, currentAssign);
+    }
+
+    backtrack(0, 0, []);
+    return bestAssignment;
+}
+
+async function calculateOptimizedRoute() {
+    const teamCount = parseInt(document.getElementById('mapTeamCount').value) || 1;
+    const routingStrategy = document.getElementById('mapRoutingStrategy').value;
+    const isStartFromHQ = document.getElementById('mapStartFromHQ').checked;
+    const checkedBoxes = document.querySelectorAll('.trip-checkbox:checked');
+    let targetTrips = [];
+
+    // 1. 대상 출장지 수집
+    if (checkedBoxes.length > 0) {
+        const selectedIds = Array.from(checkedBoxes).map(cb => cb.value);
+        targetTrips = Object.values(globalTripsData).filter(t => selectedIds.includes(t.id) && t.address);
+    } else {
+        const assignee = document.getElementById('mapAssignee').value.trim().toLowerCase();
+        const startDate = document.getElementById('mapStartDate').value;
+        const endDate = document.getElementById('mapEndDate').value;
+
+        if (!assignee || !startDate || !endDate) return await customAlert('출장 목록에서 동선을 그릴 출장지를 체크(✔)하거나,\n검색할 담당자 이름과 기간을 모두 입력해주세요.');
+        if (startDate > endDate) return await customAlert('시작일이 종료일보다 늦을 수 없습니다.');
+
+        targetTrips = Object.values(globalTripsData).filter(t => {
+            if (!t.date || !t.assignee || !t.address) return false;
+            const tName = t.assignee.toLowerCase();
+            return (tName.includes(assignee) || assignee.includes(tName)) && t.date >= startDate && t.date <= endDate;
+        });
+    }
+
+    if (typeof kakao === 'undefined' || !kakao.maps || !kakao.maps.services) {
+        document.getElementById('tripMap').innerHTML = '<span style="color:var(--danger);">지도 API 로드 실패</span>';
+        return await customAlert("카카오 지도 API가 연결되지 않았습니다.\n\nindex.html에 카카오 <script> 태그가 정확히 있는지 확인해주세요.");
+    }
+
+    document.getElementById('tripMap').innerHTML = '<div style="color:var(--text-main); font-weight:bold;">주소를 좌표로 변환하며 경로를 계산 중입니다...⏳</div>';
+    document.getElementById('tripRouteList').innerHTML = '';
+
+    if (targetTrips.length === 0) {
+        document.getElementById('tripMap').innerHTML = '<span style="color:var(--text-muted);">선택된 출장지 중 주소가 입력된 내역이 없거나 조건에 맞지 않습니다.</span>';
+        return;
+    }
+
+    // 2. 주소 -> 좌표 변환 (카카오 내장 Geocoder 사용)
+    const tripsWithCoords = [];
+    let failedTrips = [];
+    const geocoder = new kakao.maps.services.Geocoder();
+
+    for (let t of targetTrips) {
+        await new Promise(resolve => {
+            geocoder.addressSearch(t.address, function(result, status) {
+                if (status === kakao.maps.services.Status.OK) {
+                    tripsWithCoords.push({ ...t, lat: parseFloat(result[0].y), lng: parseFloat(result[0].x) });
+                } else {
+                    console.warn('주소 변환 실패:', t.address);
+                    failedTrips.push(t.name);
+                }
+                resolve();
+            });
+        });
+    }
+
+    if (failedTrips.length > 0) {
+        showToast(`⚠️ 아래 출장지는 주소를 찾을 수 없어 동선에서 제외되었습니다:\n👉 ${failedTrips.join(', ')}\n\n(상호명이 아닌 정확한 도로명/지번 주소로 수정해주세요!)`, "warning");
+    }
+
+    if (tripsWithCoords.length === 0) return await customAlert('입력된 주소들 중 지도에서 찾을 수 있는 정확한 주소가 없습니다.');
+
+    // 본점(출발지) 좌표 세팅
+    const hqAddress = "서울시 영등포구 도신로 143";
+    let hqCoords = null;
+    await new Promise(resolve => {
+        geocoder.addressSearch(hqAddress, function(result, status) {
+            if (status === kakao.maps.services.Status.OK) {
+                hqCoords = { lat: parseFloat(result[0].y), lng: parseFloat(result[0].x), name: "본점 센터", address: hqAddress, isHQ: true };
+            }
+            resolve();
+        });
+    });
+    if (!hqCoords) hqCoords = { lat: 37.506543, lng: 126.904543, name: "본점 센터", address: hqAddress, isHQ: true };
+
+    const TEAM_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6'];
+    
+    let teams = Array.from({length: teamCount}, (_, i) => ({
+        teamId: i + 1,
+        color: TEAM_COLORS[i % TEAM_COLORS.length],
+        route: [],
+        path: [],
+        totalDistance: 0,
+        totalDuration: 0,
+        lastPoint: isStartFromHQ ? hqCoords : null // 본점 여정 시작일 경우 첫 포인트 고정
+    }));
+
+    let skippedTrips = [];
+
+    let tripsByDate = {};
+    tripsWithCoords.forEach(t => {
+        if (!tripsByDate[t.date]) tripsByDate[t.date] = [];
+        tripsByDate[t.date].push(t);
+    });
+    const sortedDates = Object.keys(tripsByDate).sort((a,b) => new Date(a) - new Date(b));
+
+    // --- 알고리즘 분기점 ---
+    if (routingStrategy === 'total_distance') {
+        for (let date of sortedDates) {
+            let todaysTrips = [...tripsByDate[date]];
+            let bestAssignment = getDailyBestAssignment(teams, todaysTrips);
+            
+            let assignedTripIndices = new Set();
+            bestAssignment.forEach(assign => {
+                let team = teams[assign.teamIdx];
+                let trip = todaysTrips[assign.tripIdx];
+                team.route.push(trip);
+                team.lastPoint = trip;
+                assignedTripIndices.add(assign.tripIdx);
+            });
+            
+            for (let i = 0; i < todaysTrips.length; i++) {
+                if (!assignedTripIndices.has(i)) skippedTrips.push(todaysTrips[i]);
+            }
+        }
+    } else if (routingStrategy === 'sequential') {
+        // [옵션 2] 전날 출장지 기준 (가까운 곳 우선 - 무조건 직전 위치에서 가장 가까운 곳 줍기)
+        for (let date of sortedDates) {
+            let todaysTrips = [...tripsByDate[date]];
+            let availableTeams = teams.map((t, idx) => idx);
+
+            while (todaysTrips.length > 0 && availableTeams.length > 0) {
+                let bestTeamIdx = -1;
+                let bestTripIdx = -1;
+                let minDistance = Infinity;
+
+                for (let i = 0; i < availableTeams.length; i++) {
+                    let teamIdx = availableTeams[i];
+                    let team = teams[teamIdx];
+                    for (let j = 0; j < todaysTrips.length; j++) {
+                        let trip = todaysTrips[j];
+                        let dist = team.lastPoint ? getHaversineDistance(team.lastPoint.lat, team.lastPoint.lng, trip.lat, trip.lng) : (1000 - trip.lat);
+                        if (dist < minDistance) { minDistance = dist; bestTeamIdx = teamIdx; bestTripIdx = j; }
+                    }
+                }
+
+                let selectedTeam = teams[bestTeamIdx];
+                let selectedTrip = todaysTrips.splice(bestTripIdx, 1)[0];
+                selectedTeam.route.push(selectedTrip);
+                selectedTeam.lastPoint = selectedTrip;
+                availableTeams = availableTeams.filter(idx => idx !== bestTeamIdx);
+            }
+            if (todaysTrips.length > 0) skippedTrips.push(...todaysTrips);
+        }
+    } else if (routingStrategy === 'time') {
+        // [옵션 3] 실시간 교통 상황 기준 (카카오내비 실제 주행 시간 비교)
+        document.getElementById('tripMap').innerHTML = '<div style="color:var(--text-main); font-weight:bold;">실시간 교통정보(카카오내비)를 분석 중입니다...⏳<br><small style="font-weight:normal;color:var(--text-muted);">요청이 많아 약간의 시간이 소요될 수 있습니다.</small></div>';
+        
+        for (let date of sortedDates) {
+            let todaysTrips = [...tripsByDate[date]];
+            let availableTeams = teams.map((t, idx) => idx);
+
+            while (todaysTrips.length > 0 && availableTeams.length > 0) {
+                let combinations = [];
+                for (let i = 0; i < availableTeams.length; i++) {
+                    let teamIdx = availableTeams[i];
+                    for (let j = 0; j < todaysTrips.length; j++) {
+                        combinations.push({ teamIdx, tripIdx: j, team: teams[teamIdx], trip: todaysTrips[j] });
+                    }
+                }
+
+                // 남아있는 모든 경우의 수를 동시에 카카오 내비에 물어보고 가장 덜 막히는 길을 찾아냄
+                await Promise.all(combinations.map(async (combo) => {
+                    if (combo.team.lastPoint) {
+                        let roadData = await getRoadRoute(combo.team.lastPoint, combo.trip);
+                        combo.duration = roadData.duration;
+                    } else {
+                        combo.duration = (1000 - combo.trip.lat) * 3600; // 초기 위치가 없을 때 위도 기준 방어
+                    }
+                }));
+
+                let bestCombo = combinations.reduce((min, curr) => curr.duration < min.duration ? curr : min, {duration: Infinity});
+
+                let selectedTeam = teams[bestCombo.teamIdx];
+                let selectedTrip = todaysTrips.splice(bestCombo.tripIdx, 1)[0];
+                selectedTeam.route.push(selectedTrip);
+                selectedTeam.lastPoint = selectedTrip;
+                availableTeams = availableTeams.filter(idx => idx !== bestCombo.teamIdx);
+            }
+            if (todaysTrips.length > 0) skippedTrips.push(...todaysTrips);
+        }
+    }
+
+    if (skippedTrips.length > 0) {
+        showToast(`⚠️ [팀 수 부족] 1팀 1일 1출장 원칙에 따라, 배정받지 못한 출장지가 ${skippedTrips.length}곳 있습니다.\n모든 동선을 소화하려면 팀(차량) 수를 늘려주세요.`, "warning");
+    }
+
+    // 4. 팀별로 확정된 스케줄을 따라 카카오 내비 실제 도로 호출 (순차적)
+    for (let team of teams) {
+        if (team.route.length === 0) continue;
+        
+        let current = isStartFromHQ ? hqCoords : null;
+        for (let trip of team.route) {
+            if (current) {
+                let roadData = await getRoadRoute(current, trip); 
+                trip.distFromPrev = roadData.distance;
+                trip.durationFromPrev = roadData.duration;
+                team.totalDistance += roadData.distance;
+                team.totalDuration += roadData.duration;
+                if (roadData.path && roadData.path.length > 0) {
+                    team.path.push(...roadData.path);
+                } else {
+                    team.path.push(new kakao.maps.LatLng(current.lat, current.lng));
+                    team.path.push(new kakao.maps.LatLng(trip.lat, trip.lng));
+                }
+            } else {
+                trip.distFromPrev = 0;
+                trip.durationFromPrev = 0;
+            }
+            current = trip;
+        }
+    }
+    
+    const finalRoutes = teams.filter(t => t.route.length > 0);
+
+    // 5. 지도 렌더링
+    const mapContainer = document.getElementById('tripMap');
+    mapContainer.innerHTML = '';
+    const initialCenter = finalRoutes.length > 0 && finalRoutes[0].route.length > 0 ? new kakao.maps.LatLng(finalRoutes[0].route[0].lat, finalRoutes[0].route[0].lng) : new kakao.maps.LatLng(37.506543, 126.904543);
+    const mapOptions = { center: initialCenter, level: 8 };
+    tripMap = new kakao.maps.Map(mapContainer, mapOptions);
+    
+    const bounds = new kakao.maps.LatLngBounds();
+    const listEl = document.getElementById('tripRouteList');
+
+    if (isStartFromHQ && hqCoords) {
+        const hqPosition = new kakao.maps.LatLng(hqCoords.lat, hqCoords.lng);
+        bounds.extend(hqPosition);
+        const hqContentEl = document.createElement('div');
+        hqContentEl.innerHTML = `<div style="background-color: #1F2937; color: white; padding: 4px 8px; border-radius: 8px; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 0.85rem; border: 2px solid white; box-shadow: var(--shadow-sm); cursor: pointer;"><span class="material-symbols-rounded" style="font-size:1.1em; margin-right:4px;">apartment</span>본점</div>`;
+        const hqOverlay = new kakao.maps.CustomOverlay({ position: hqPosition, content: hqContentEl, yAnchor: 0.5, zIndex: 10 });
+        hqOverlay.setMap(tripMap);
+    }
+
+    finalRoutes.sort((a,b) => a.teamId - b.teamId).forEach(teamData => {
+        const color = teamData.color;
+        
+        let hrs = Math.floor(teamData.totalDuration / 3600);
+        let mins = Math.floor((teamData.totalDuration % 3600) / 60);
+        let durationText = hrs > 0 ? `${hrs}시간 ${mins}분` : `${mins}분`;
+
+        // 팀 헤더 및 총 주행 거리 표시
+        const headerLi = document.createElement('div');
+        headerLi.className = 'route-team-header';
+        headerLi.style.borderColor = color;
+        headerLi.style.color = color;
+        headerLi.innerHTML = `<span class="material-symbols-rounded">local_shipping</span> ${teamData.teamId}팀 배정 동선 <span style="margin-left:auto; font-size:0.85rem; color:var(--text-muted); font-weight:normal;">총 이동: <b style="color:${color}; font-size:1.1rem;">${teamData.totalDistance.toFixed(1)}km</b> (${durationText})</span>`;
+        listEl.appendChild(headerLi);
+
+        let currentRenderDate = null;
+        let tripNumber = 1; // 순번 카운터
+
+        teamData.route.forEach((trip) => {
+            const position = new kakao.maps.LatLng(trip.lat, trip.lng);
+            bounds.extend(position);
+
+            if (currentRenderDate !== trip.date) {
+                const dateHeader = document.createElement('div');
+                dateHeader.style.cssText = 'font-size:0.85rem; color:var(--text-muted); margin: 0.8rem 0 0.2rem 0.5rem; font-weight:bold;';
+                dateHeader.textContent = `🗓 [${trip.date}]`;
+                listEl.appendChild(dateHeader);
+                
+                if (isStartFromHQ && tripNumber === 1) { // 첫날의 맨 처음에만 본점 표시
+                    const startLi = document.createElement('div');
+                    startLi.className = 'route-item';
+                    startLi.innerHTML = `<div class="route-item-number" style="background-color: #1F2937; width:auto; padding:0 8px; border-radius:12px; font-size: 0.8rem;">출발</div>
+                        <div class="route-item-info">
+                            <div class="route-item-title">${hqCoords.name}</div><div class="route-item-address">${hqCoords.address}</div>
+                        </div>`;
+                    listEl.appendChild(startLi);
+                }
+                currentRenderDate = trip.date;
+            }
+
+            // 마커 렌더링 (순번 표시)
+            const contentEl = document.createElement('div');
+            contentEl.innerHTML = `<div style="background-color: ${color}; color: white; width: 28px; height: 28px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 1.1rem; border: 2px solid white; box-shadow: var(--shadow-sm); cursor: pointer;">${tripNumber}</div>`;
+            const customOverlay = new kakao.maps.CustomOverlay({ position: position, content: contentEl, yAnchor: 0.5, zIndex: 2 });
+            customOverlay.setMap(tripMap);
+            
+            const infoOverlay = new kakao.maps.CustomOverlay({ position: position, content: `<div style="padding:8px; font-size:0.85rem; color:#333; background:white; border-radius:4px; box-shadow:var(--shadow-md); border:2px solid ${color}; transform: translateY(-40px); white-space: nowrap;">${trip.name}</div>`, yAnchor: 1, zIndex: 3 });
+            contentEl.addEventListener('mouseenter', () => infoOverlay.setMap(tripMap));
+            contentEl.addEventListener('mouseleave', () => infoOverlay.setMap(null));
+
+            let tripHrs = Math.floor(trip.durationFromPrev / 3600);
+            let tripMins = Math.floor((trip.durationFromPrev % 3600) / 60);
+            let tripDurationText = tripHrs > 0 ? `${tripHrs}시간 ${tripMins}분` : `${tripMins}분`;
+
+            // 목록 아이템 렌더링
+            const li = document.createElement('div');
+            li.className = 'route-item';
+            li.innerHTML = `<div class="route-item-number" style="background-color: ${color};">${tripNumber}</div>
+                <div class="route-item-info">
+                    <div class="route-item-title">${trip.name}</div><div class="route-item-address">${trip.address}</div>
+                    ${trip.distFromPrev > 0 ? `<div class="route-item-dist" style="color:${color};">↑ 차량 이동 약 ${trip.distFromPrev.toFixed(1)}km (${tripDurationText})</div>` : ''}
+                </div>`;
+            listEl.appendChild(li);
+            
+            tripNumber++; // 순번 증가
+        });
+        
+        // 팀 전체 경로 선 한 번에 그리기 (서버 부하 없이 매끄럽게 연결)
+        if (teamData.path && teamData.path.length > 0) {
+            teamData.path.forEach(p => bounds.extend(p));
+            const polyline = new kakao.maps.Polyline({ 
+                path: teamData.path, 
+                strokeWeight: 6, 
+                strokeColor: color, 
+                strokeOpacity: 0.8, 
+                strokeStyle: 'solid' 
+            });
+            polyline.setMap(tripMap);
+        }
+    });
+    
+    if (finalRoutes.some(r => r.route.length > 0)) {
+        tripMap.setBounds(bounds);
+    }
+}

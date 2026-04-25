@@ -474,6 +474,24 @@
                 </div>
                 <input type="text" id="tripAddress" placeholder="출장지 주소" class="search-input" style="width: 100%; box-sizing: border-box;">
                 
+                <!-- 여기어때/카카오맵 숙소 연동 UI -->
+                <div style="border-top: 1px dashed var(--border-color); margin-top: 0.5rem; padding-top: 1rem;">
+                    <label style="font-size: 0.9rem; font-weight: 600; display:flex; align-items:center; gap:4px; color:#E63946;">
+                        <span class="material-symbols-rounded">hotel</span> 숙소 검색 및 예약
+                    </label>
+                    <div style="display: flex; gap: 0.8rem; margin-top: 0.5rem;">
+                        <select id="tripRoomType" class="search-input" style="flex: 1;">
+                            <option value="single">1인실 (싱글/더블)</option>
+                            <option value="twin">2인실 (트윈룸)</option>
+                        </select>
+                        <button onclick="searchAccommodation()" style="background-color: #E63946; color: white; border: none; flex: 1; display:flex; align-items:center; justify-content:center; gap:4px;">
+                            <span class="material-symbols-rounded" style="font-size:1.1em;">search</span> 근처 숙소 찾기
+                        </button>
+                    </div>
+                    <input type="hidden" id="tripBookedHotel" value="">
+                    <div id="accommodationResults" style="display: none; margin-top: 1rem; flex-direction: column; gap: 0.5rem;"></div>
+                </div>
+
                 <label style="font-size: 0.9rem; font-weight: 600; margin-top: 0.5rem;">당일 타임 테이블 (파일 첨부)</label>
                 <input type="file" id="tripScheduleFile" class="file-input-hidden" onchange="updateFileName('tripScheduleFile', 'currentScheduleFile')">
                 <label for="tripScheduleFile" class="file-input-label">파일 첨부</label>
@@ -642,7 +660,11 @@
         </div>
     </div>
 
-    <script src="script.js?v=999"></script>
+    <script src="config.js"></script>
+    <script src="kanban.js"></script>
+    <script src="map.js"></script>
+    <script src="services.js"></script>
+    <script src="main.js"></script>
     <script>
         // 악성 캐시 및 좀비 서비스 워커 완전 박멸
         if ('serviceWorker' in navigator) {
