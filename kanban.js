@@ -156,6 +156,10 @@ function openModal(taskId, title, description, dueDate, startDate) {
     document.getElementById('modalDescription').value = description || '';
     document.getElementById('modalStartDate').value = startDate || '';
     document.getElementById('modalDueDate').value = dueDate || '';
+    
+    const task = AppStore.getTasks()[taskId];
+    document.getElementById('taskAuthorDisplay').textContent = task && task.author ? `등록: ${task.author}` : '';
+
     document.getElementById('taskModal').style.display = 'flex';
 }
 
@@ -211,7 +215,12 @@ function buildCalendarGrid(gridId, titleId, dateObj, isMyPage, renderCallback) {
 function renderModalCalendar() {
     const priorityWeight = { 'high': 3, 'medium': 2, 'low': 1 };
     const tasksArray = Object.values(AppStore.getTasks()).sort((a, b) => (priorityWeight[b.priority] || 2) - (priorityWeight[a.priority] || 2));
-    const tripsArray = Object.values(AppStore.getTrips()).map(t => ({ ...t, isTrip: true, title: `⚑ [출장] ${t.name}`, startDate: t.date, dueDate: t.date, status: 'todo' }));
+    const tripsArray = Object.values(AppStore.getTrips()).map(t => {
+        let reqGender = t.requiredGender || (t.requiresFemale ? 'female' : 'any');
+        let badge = reqGender === 'female' ? ' 👩‍💼' : (reqGender === 'male' ? ' 👨‍💼' : '');
+        let reqPers = t.requiredPersonnel || 1;
+        return { ...t, isTrip: true, title: `⚑ [출장] ${t.name} [${reqPers}명]${badge}`, startDate: t.date, dueDate: t.date, status: 'todo' };
+    });
     const leavesArray = Object.values(AppStore.getLeaves()).filter(l => l.status === 'approved').map(l => ({ id: l.id, isLeave: true, title: `[휴가] ${l.userName}`, name: `[휴가] ${l.userName}`, assignee: l.userName, startDate: l.date, dueDate: l.date, status: 'todo', priority: 'medium' }));
     const combinedArray = [...tasksArray, ...tripsArray, ...leavesArray];
 
@@ -367,7 +376,16 @@ function renderTasks() {
         progressFill.style.width = p + '%'; progressText.textContent = p + '%';
     }
 
-    const tripsArray = Object.values(AppStore.getTrips()).map(t => ({ ...t, isTrip: true, title: `[출장] ${t.name}`, startDate: t.date, dueDate: t.date, status: 'todo' }));
+    const tripsArray = Object.values(AppStore.getTrips()).map(t => {
+        let reqGender = t.requiredGender || (t.requiresFemale ? 'female' : 'any');
+        let reqPers = t.requiredPersonnel || 1;
+        
+        let htmlBadges = `<span style="font-size:0.65rem; background-color:var(--col-bg); color:var(--text-muted); padding:2px 4px; border-radius:4px; margin-left:6px; font-weight:bold; vertical-align:middle; border:1px solid var(--border-color);">${reqPers}명</span>`;
+        if (reqGender === 'female') htmlBadges += `<span style="font-size:0.65rem; background-color:#FCE7F3; color:#EC4899; padding:2px 4px; border-radius:4px; margin-left:4px; font-weight:bold; vertical-align:middle;">👩‍💼 여성</span>`;
+        else if (reqGender === 'male') htmlBadges += `<span style="font-size:0.65rem; background-color:#E0F2FE; color:#3B82F6; padding:2px 4px; border-radius:4px; margin-left:4px; font-weight:bold; vertical-align:middle;">👨‍💼 남성</span>`;
+
+        return { ...t, isTrip: true, title: `⚑ [출장] ${t.name}`, badgesHtml: htmlBadges, startDate: t.date, dueDate: t.date, status: 'todo' };
+    });
     const leavesArray = Object.values(AppStore.getLeaves()).filter(l => l.status === 'approved').map(l => ({ id: l.id, isLeave: true, title: `[휴가] ${l.userName}`, assignee: l.userName, startDate: l.date, dueDate: l.date, status: 'todo', priority: 'medium' }));
     const combinedArray = [...tasksArray, ...tripsArray, ...leavesArray];
 
@@ -380,6 +398,7 @@ function renderTasks() {
 
     tasksArray.forEach(task => {
         const div = document.createElement('div'); div.className = 'task-card';
+        div.title = task.author ? `등록자: ${task.author}` : '';
         if (AppStore.getViewMode() === 'status') { 
             div.draggable = true; 
             div.ondragstart = (e) => drag(e, task.id); 
@@ -400,7 +419,7 @@ function renderTasks() {
         }
 
         div.innerHTML = `<div style="display: flex; flex-direction: column; gap: 0.5rem; width: 100%;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start;"><span style="font-weight: 500; font-size: 0.95rem; word-break: break-all;">${task.title}</span><button class="delete-btn" onclick="deleteTask('${task.id}')" title="삭제" style="padding:0.2rem; flex-shrink: 0; margin-left: 0.5rem;"><span class="material-symbols-rounded" style="font-size:1.1em;">close</span></button></div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;"><span style="font-weight: 500; font-size: 0.95rem; word-break: break-all;">${task.title}${task.badgesHtml || ''}</span><button class="delete-btn" onclick="deleteTask('${task.id}')" title="삭제" style="padding:0.2rem; flex-shrink: 0; margin-left: 0.5rem;"><span class="material-symbols-rounded" style="font-size:1.1em;">close</span></button></div>
             ${(descIcon || dueBadge) ? `<div style="display: flex; align-items: center; margin-top: -0.2rem;">${descIcon}${dueBadge}</div>` : ''}
             <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem;"><span style="color: var(--text-muted);">담당: ${task.assignee || '미지정'}</span><span style="background-color: ${priorityColor}15; color: ${priorityColor}; padding: 0.2rem 0.5rem; border-radius: 4px; font-weight: 600;">${priorityLabel}</span></div>
         </div>`;

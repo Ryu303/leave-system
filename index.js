@@ -1,5 +1,8 @@
 const functions = require("firebase-functions");
+const admin = require("firebase-admin");
 const axios = require("axios"); // npm install axios 필요
+
+admin.initializeApp();
 
 // 프론트엔드에서 호출할 수 있는 Callable Function
 exports.getKakaoRoute = functions.region('asia-northeast3').https.onCall(async (data, context) => {
@@ -13,10 +16,9 @@ exports.getKakaoRoute = functions.region('asia-northeast3').https.onCall(async (
         throw new functions.https.HttpsError('invalid-argument', '출발지와 도착지 좌표가 필요합니다.');
     }
 
-    // 🔥 핵심 수정 1: 평문 키값 삭제 (무조건 환경변수에서만 가져오도록)
-    const KAKAO_REST_API_KEY = process.env.KAKAO_REST_API_KEY; 
-    
-    // 🔥 핵심 수정 2: URL 템플릿 리터럴에 포함된 잘못된 꺾쇠 < > 제거
+    // 2. 카카오 REST API 호출 (서버 환경 변수로 키를 완벽하게 숨김)
+    // *실제 운영 시에는 터미널에서 firebase functions:config:set kakao.key="내API키" 로 암호화하여 저장하세요.
+    const KAKAO_REST_API_KEY = process.env.KAKAO_REST_API_KEY || "9159f23f57165f61ac722d066d6f43b5";
     const url = `https://apis-navi.kakaomobility.com/v1/directions?origin=${origin.lng},${origin.lat}&destination=${destination.lng},${destination.lat}`;
 
     try {
@@ -30,5 +32,36 @@ exports.getKakaoRoute = functions.region('asia-northeast3').https.onCall(async (
         console.error("Kakao API Error:", error.response ? error.response.data : error.message);
         // 프론트엔드에는 구체적인 에러 원인을 숨기고 일반적인 메시지만 전달하여 추가적인 보안 확보
         throw new functions.https.HttpsError('internal', '경로를 가져오는 중 서버 오류가 발생했습니다.');
+    }
+});
+
+// Apps Script (지메일 파싱) 전용 Webhook API
+exports.webhookAddTrip = functions.region('asia-northeast3').https.onRequest(async (req, res) => {
+    // 1. 간단한 보안 토큰 검사 (Apps Script와 맞춘 비밀번호)
+    const SECRET_TOKEN = "my-secret-faww-token-2024";
+    if (req.headers.authorization !== `Bearer ${SECRET_TOKEN}`) {
+        return res.status(403).send("Unauthorized");
+    }
+
+    // 2. Apps Script에서 보낸 데이터 받기
+    const tripData = req.body;
+    
+    if (!tripData || !tripData.name || !tripData.date) {
+        return res.status(400).send("Bad Request: Missing required fields");
+    }
+
+    try {
+        // 3. Admin SDK를 사용하여 DB에 출장 강제 등록 (보안 규칙 우회)
+        tripData.timestamp = Date.now();
+        tripData.author = tripData.author || "Gmail 자동 등록";
+        
+        const ref = admin.database().ref('businessTrips').push();
+        tripData.id = ref.key;
+        await ref.set(tripData);
+        
+        res.status(200).send({ success: true, id: ref.key });
+    } catch (error) {
+        console.error("Webhook Error:", error);
+        res.status(500).send("Internal Server Error");
     }
 });

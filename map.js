@@ -24,6 +24,12 @@ function openTripModal(id = null, name = '', date = '', assignee = '', contact =
     document.getElementById('tripScheduleFile').dataset.existingUrl = scheduleUrl;
     document.getElementById('tripScheduleFile').dataset.existingPath = schedulePath;
     document.getElementById('currentScheduleFile').textContent = scheduleUrl ? `첨부됨: ${schedulePath.split('_').pop()}` : '';
+    
+    const trip = AppStore.getTrips()[id];
+    document.getElementById('tripRequiredGender').value = trip && trip.requiredGender ? trip.requiredGender : (trip && trip.requiresFemale ? 'female' : 'any');
+    document.getElementById('tripRequiredPersonnel').value = trip && trip.requiredPersonnel ? trip.requiredPersonnel : 1;
+    document.getElementById('tripAuthorDisplay').textContent = trip && trip.author ? `등록: ${trip.author}` : '';
+    
     document.getElementById('tripModal').style.display = 'flex';
 }
 
@@ -111,7 +117,10 @@ async function saveTrip() {
             contact: document.getElementById('tripContact').value.trim(), address: document.getElementById('tripAddress').value.trim(),
             roomType: document.getElementById('tripRoomType').value, bookedHotel: document.getElementById('tripBookedHotel').value,
             scheduleUrl: document.getElementById('tripScheduleFile').dataset.existingUrl || '', schedulePath: document.getElementById('tripScheduleFile').dataset.existingPath || '',
-            qrUrl: '', qrPath: ''
+            qrUrl: '', qrPath: '',
+            requiredGender: document.getElementById('tripRequiredGender').value,
+            requiredPersonnel: parseInt(document.getElementById('tripRequiredPersonnel').value) || 1,
+            author: currentTripId ? AppStore.getTrips()[currentTripId].author : (AppStore.getCurrentUser() ? AppStore.getCurrentUser().displayName : '익명')
         };
         if (currentTripId) await db.ref('businessTrips/' + currentTripId).update(tripData);
         else { tripData.timestamp = Date.now(); const ref = db.ref('businessTrips').push(); tripData.id = ref.key; await ref.set(tripData); }
@@ -142,7 +151,8 @@ document.getElementById('tripModal').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'BUTTON') { e.preventDefault(); saveTrip(); }
 });
 
-db.ref('businessTrips').on('value', (s) => {
+// 출장 데이터 최적화: 최신 300개만 로드
+db.ref('businessTrips').orderByKey().limitToLast(300).on('value', (s) => {
     const data = s.val() || {}; 
     for(let key in data) data[key].id = key; // 진짜 DB 키로 강제 동기화
     AppStore.setTrips(data);
@@ -152,8 +162,16 @@ function renderTripList() {
     const list = document.getElementById('trip-list'); if (!list) return; list.innerHTML = '';
     Object.values(AppStore.getTrips()).sort((a,b) => (a.date ? new Date(a.date).getTime() : Infinity) - (b.date ? new Date(b.date).getTime() : Infinity)).forEach(trip => {
         const div = document.createElement('div'); div.className = 'trip-card';
+        
+        let reqGender = trip.requiredGender || (trip.requiresFemale ? 'female' : 'any');
+        let reqPers = trip.requiredPersonnel || 1;
+        let badges = `<span style="font-size:0.7rem; background-color:var(--col-bg); color:var(--text-muted); padding:2px 6px; border-radius:4px; margin-left:6px; font-weight:bold; vertical-align:middle; border:1px solid var(--border-color);">${reqPers}명</span>`;
+        if (reqGender === 'female') badges += `<span style="font-size:0.7rem; background-color:#FCE7F3; color:#EC4899; padding:2px 6px; border-radius:4px; margin-left:4px; font-weight:bold; vertical-align:middle;">👩‍💼 여성 필수</span>`;
+        else if (reqGender === 'male') badges += `<span style="font-size:0.7rem; background-color:#E0F2FE; color:#3B82F6; padding:2px 6px; border-radius:4px; margin-left:4px; font-weight:bold; vertical-align:middle;">👨‍💼 남성 필수</span>`;
+
+        div.title = trip.author ? `등록자: ${trip.author}` : '';
         if (trip.date && new Date(trip.date).setHours(0,0,0,0) < new Date().setHours(0,0,0,0)) div.classList.add('past-trip');
-        div.innerHTML = `<div class="trip-header"><div style="display:flex; align-items:flex-start; gap:10px;"><input type="checkbox" class="trip-checkbox" value="${trip.id}" style="width:18px; height:18px; margin-top:2px; cursor:pointer;" title="동선 최적화 선택"><div style="flex:1;"><div class="trip-title">${trip.name}</div><div class="trip-date">${trip.date}</div></div></div><div style="display:flex;gap:0.3rem;"><button class="delete-btn edit" style="padding:0.3rem;background:var(--col-bg);color:var(--text-main)"><span class="material-symbols-rounded">edit</span></button><button class="delete-btn del" style="padding:0.3rem"><span class="material-symbols-rounded">close</span></button></div></div><div class="trip-info-row">${trip.address}${trip.bookedHotel ? `<div style="color:#E63946; font-size:0.8rem; font-weight:bold; margin-top:4px;"><span class="material-symbols-rounded" style="font-size:1.1em; vertical-align:middle;">hotel</span> 예약 숙소: ${trip.bookedHotel}</div>` : ''}</div>`;
+        div.innerHTML = `<div class="trip-header"><div style="display:flex; align-items:flex-start; gap:10px;"><input type="checkbox" class="trip-checkbox" value="${trip.id}" style="width:18px; height:18px; margin-top:2px; cursor:pointer;" title="동선 최적화 선택"><div style="flex:1;"><div class="trip-title">${trip.name}${badges}</div><div class="trip-date">${trip.date}</div></div></div><div style="display:flex;gap:0.3rem;"><button class="delete-btn edit" style="padding:0.3rem;background:var(--col-bg);color:var(--text-main)"><span class="material-symbols-rounded">edit</span></button><button class="delete-btn del" style="padding:0.3rem"><span class="material-symbols-rounded">close</span></button></div></div><div class="trip-info-row">${trip.address}${trip.bookedHotel ? `<div style="color:#E63946; font-size:0.8rem; font-weight:bold; margin-top:4px;"><span class="material-symbols-rounded" style="font-size:1.1em; vertical-align:middle;">hotel</span> 예약 숙소: ${trip.bookedHotel}</div>` : ''}</div>`;
         
         div.onclick = (e) => {
             if (e.target.closest('.edit') || e.target.closest('.del')) return;
@@ -167,6 +185,28 @@ function renderTripList() {
         list.appendChild(div);
     });
 }
+
+// 동선 옵션의 팀 설정 동적 렌더링
+function renderTeamSettings() {
+    const count = parseInt(document.getElementById('mapTeamCount').value) || 1;
+    const container = document.getElementById('mapTeamSettings');
+    if (!container) return;
+    let html = '';
+    for(let i=1; i<=count; i++) {
+        html += `
+        <div style="display:flex; align-items:center; gap:6px; background:var(--card-bg); padding:6px 10px; border-radius:8px; border:1px solid var(--border-color); font-size:0.85rem; box-shadow:var(--shadow-sm);">
+            <strong style="color:var(--primary); font-size:0.95rem;">${i}팀</strong>
+            인원: <input type="number" id="team_personnel_${i}" value="1" min="1" style="width:40px; padding:4px; text-align:center; border:1px solid var(--border-color); border-radius:4px; outline:none;">
+            성별: <select id="team_gender_${i}" style="padding:4px; border:1px solid var(--border-color); border-radius:4px; outline:none;">
+                <option value="mixed">일반</option>
+                <option value="male">👨‍💼 남성만</option>
+                <option value="female">👩‍💼 여성만</option>
+            </select>
+        </div>`;
+    }
+    container.innerHTML = html;
+}
+setTimeout(renderTeamSettings, 200); // 페이지 로드 직후 1회 렌더링
 
 let tripMap = null;
 let mapPolylines = [];
@@ -183,16 +223,12 @@ function getHaversineDistance(lat1, lon1, lat2, lon2) {
 
 // 카카오 내비 API를 활용한 실제 도로 경로 및 거리 탐색 함수
 async function getRoadRoute(point1, point2) {
+    const KAKAO_REST_API_KEY = "9159f23f57165f61ac722d066d6f43b5";
+    const url = `https://apis-navi.kakaomobility.com/v1/directions?origin=${point1.lng},${point1.lat}&destination=${point2.lng},${point2.lat}`;
     try {
-        // 🔥 핵심 수정: 호출할 때 'asia-northeast3' (서울) 리전을 명시해야 해!
-        const getKakaoRoute = firebase.app().functions('asia-northeast3').httpsCallable('getKakaoRoute');
-        const res = await getKakaoRoute({
-            origin: { lat: point1.lat, lng: point1.lng },
-            destination: { lat: point2.lat, lng: point2.lng }
-        });
-        
-        if (res && res.data) {
-            const data = res.data;
+        const res = await fetch(url, { headers: { 'Authorization': `KakaoAK ${KAKAO_REST_API_KEY}` } });
+        if (res.ok) {
+            const data = await res.json();
             if (data.routes && data.routes.length > 0) {
                 const route = data.routes[0];
                 const distance = route.summary.distance / 1000; // 미터를 km로 변환
@@ -209,7 +245,8 @@ async function getRoadRoute(point1, point2) {
             }
         }
     } catch (e) {
-        console.warn("도로 경로 조회 실패. 직선거리로 대체합니다.", e);
+        console.error("🔥 카카오 내비 API 통신 실패:", e);
+        showToast("경로 통신 오류로 직선거리로 대체되었습니다.", "warning");
     }
     // 내비 API 실패 시 기존 직선거리 로직으로 자동 폴백(안전장치)
     let fallbackDist = getHaversineDistance(point1.lat, point1.lng, point2.lat, point2.lng);
@@ -239,6 +276,15 @@ function getDailyBestAssignment(teams, trips) {
             if (usedTrips[i]) continue;
             let team = teams[teamPtr];
             let trip = trips[i];
+            
+            let reqG = trip.requiredGender || (trip.requiresFemale ? 'female' : 'any');
+            let reqP = trip.requiredPersonnel || 1;
+
+            // 🔥 제약 조건: 요구 인원수 초과 시 또는 성별 불일치 시 배정 불가
+            if (reqP > team.personnel) continue;
+            if (reqG === 'female' && team.gender === 'male') continue;
+            if (reqG === 'male' && team.gender === 'female') continue;
+
             let dist = team.lastPoint ? getHaversineDistance(team.lastPoint.lat, team.lastPoint.lng, trip.lat, trip.lng) : (1000 - trip.lat);
             
             usedTrips[i] = true;
@@ -288,6 +334,21 @@ async function calculateOptimizedRoute() {
     document.getElementById('tripMap').innerHTML = '<div style="color:var(--text-main); font-weight:bold;">주소를 좌표로 변환하며 경로를 계산 중입니다...⏳</div>';
     document.getElementById('tripRouteList').innerHTML = '';
 
+    // 사전에 불가능한 조건이 있는지 필터링
+    let teamsPreview = Array.from({length: teamCount}, (_, i) => ({
+        personnel: parseInt(document.getElementById(`team_personnel_${i+1}`)?.value) || 1,
+        gender: document.getElementById(`team_gender_${i+1}`)?.value || 'mixed'
+    }));
+    
+    let hasUnmatchableTrip = targetTrips.some(t => {
+        let reqG = t.requiredGender || (t.requiresFemale ? 'female' : 'any');
+        let reqP = t.requiredPersonnel || 1;
+        return teamsPreview.every(team => reqP > team.personnel || (reqG === 'female' && team.gender === 'male') || (reqG === 'male' && team.gender === 'female'));
+    });
+    if (hasUnmatchableTrip) {
+        return await customAlert('⚠️ 출장지의 요구 조건(필요 인원수 / 성별)을 만족하는 차량(팀)이 단 한 곳도 없습니다.\n[동선 옵션] 하단에서 각 팀의 인원과 성별을 넉넉하게 설정해주세요.');
+    }
+
     if (targetTrips.length === 0) {
         document.getElementById('tripMap').innerHTML = '<span style="color:var(--text-muted);">선택된 출장지 중 주소가 입력된 내역이 없거나 조건에 맞지 않습니다.</span>';
         return;
@@ -333,15 +394,18 @@ async function calculateOptimizedRoute() {
 
     const TEAM_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#14B8A6'];
     
-    let teams = Array.from({length: teamCount}, (_, i) => ({
-        teamId: i + 1,
-        color: TEAM_COLORS[i % TEAM_COLORS.length],
-        route: [],
-        path: [],
-        totalDistance: 0,
-        totalDuration: 0,
-        lastPoint: isStartFromHQ ? hqCoords : null // 본점 여정 시작일 경우 첫 포인트 고정
-    }));
+    let teams = Array.from({length: teamCount}, (_, i) => {
+        let teamIdx = i + 1;
+        return {
+            teamId: teamIdx,
+            personnel: parseInt(document.getElementById(`team_personnel_${teamIdx}`)?.value) || 1,
+            gender: document.getElementById(`team_gender_${teamIdx}`)?.value || 'mixed',
+            color: TEAM_COLORS[i % TEAM_COLORS.length],
+            route: [], path: [], totalDistance: 0, totalDuration: 0,
+            simulatedDistance: 0, simulatedDuration: 0, // 🔥 공평 분배를 위한 팀별 누적 피로도 트래커
+            lastPoint: isStartFromHQ ? hqCoords : null
+        };
+    });
 
     let skippedTrips = [];
 
@@ -364,6 +428,7 @@ async function calculateOptimizedRoute() {
                 let trip = todaysTrips[assign.tripIdx];
                 team.route.push(trip);
                 team.lastPoint = trip;
+                team.simulatedDistance += assign.dist; // 누적 거리 갱신
                 assignedTripIndices.add(assign.tripIdx);
             });
             
@@ -375,28 +440,36 @@ async function calculateOptimizedRoute() {
         // [옵션 2] 전날 출장지 기준 (가까운 곳 우선 - 무조건 직전 위치에서 가장 가까운 곳 줍기)
         for (let date of sortedDates) {
             let todaysTrips = [...tripsByDate[date]];
-            let availableTeams = teams.map((t, idx) => idx);
+            
+            // 🔥 공평 분배: 현재까지 운전 거리가 '가장 짧은' 팀부터 줄을 세워서 일감을 줌
+            let availableTeams = teams.map((t, idx) => idx).sort((a, b) => teams[a].simulatedDistance - teams[b].simulatedDistance);
 
             while (todaysTrips.length > 0 && availableTeams.length > 0) {
-                let bestTeamIdx = -1;
+                let bestTeamIdx = availableTeams[0]; // 가장 일을 안 한 팀
+                let team = teams[bestTeamIdx];
                 let bestTripIdx = -1;
                 let minDistance = Infinity;
 
-                for (let i = 0; i < availableTeams.length; i++) {
-                    let teamIdx = availableTeams[i];
-                    let team = teams[teamIdx];
-                    for (let j = 0; j < todaysTrips.length; j++) {
-                        let trip = todaysTrips[j];
-                        let dist = team.lastPoint ? getHaversineDistance(team.lastPoint.lat, team.lastPoint.lng, trip.lat, trip.lng) : (1000 - trip.lat);
-                        if (dist < minDistance) { minDistance = dist; bestTeamIdx = teamIdx; bestTripIdx = j; }
-                    }
+                for (let j = 0; j < todaysTrips.length; j++) {
+                    let trip = todaysTrips[j];
+                    
+                    let reqG = trip.requiredGender || (trip.requiresFemale ? 'female' : 'any');
+                    let reqP = trip.requiredPersonnel || 1;
+                    if (reqP > team.personnel) continue;
+                    if (reqG === 'female' && team.gender === 'male') continue;
+                    if (reqG === 'male' && team.gender === 'female') continue;
+
+                    let dist = team.lastPoint ? getHaversineDistance(team.lastPoint.lat, team.lastPoint.lng, trip.lat, trip.lng) : (1000 - trip.lat);
+                    if (dist < minDistance) { minDistance = dist; bestTripIdx = j; }
                 }
 
-                let selectedTeam = teams[bestTeamIdx];
-                let selectedTrip = todaysTrips.splice(bestTripIdx, 1)[0];
-                selectedTeam.route.push(selectedTrip);
-                selectedTeam.lastPoint = selectedTrip;
-                availableTeams = availableTeams.filter(idx => idx !== bestTeamIdx);
+                if (bestTripIdx !== -1) {
+                    let selectedTrip = todaysTrips.splice(bestTripIdx, 1)[0];
+                    team.route.push(selectedTrip);
+                    team.lastPoint = selectedTrip;
+                    team.simulatedDistance += minDistance; // 누적 거리 갱신
+                }
+                availableTeams.shift(); // 이 팀은 배정 끝
             }
             if (todaysTrips.length > 0) skippedTrips.push(...todaysTrips);
         }
@@ -406,15 +479,28 @@ async function calculateOptimizedRoute() {
         
         for (let date of sortedDates) {
             let todaysTrips = [...tripsByDate[date]];
-            let availableTeams = teams.map((t, idx) => idx);
+            
+            // 🔥 공평 분배: 현재까지 운전 시간(카카오내비 기준)이 '가장 적은' 팀부터 줄을 세움
+            let availableTeams = teams.map((t, idx) => idx).sort((a, b) => teams[a].simulatedDuration - teams[b].simulatedDuration);
 
             while (todaysTrips.length > 0 && availableTeams.length > 0) {
+                let bestTeamIdx = availableTeams[0];
+                let team = teams[bestTeamIdx];
                 let combinations = [];
-                for (let i = 0; i < availableTeams.length; i++) {
-                    let teamIdx = availableTeams[i];
-                    for (let j = 0; j < todaysTrips.length; j++) {
-                        combinations.push({ teamIdx, tripIdx: j, team: teams[teamIdx], trip: todaysTrips[j] });
-                    }
+                
+                for (let j = 0; j < todaysTrips.length; j++) {
+                    let trip = todaysTrips[j];
+                    let reqG = trip.requiredGender || (trip.requiresFemale ? 'female' : 'any');
+                    let reqP = trip.requiredPersonnel || 1;
+                    if (reqP > team.personnel) continue;
+                    if (reqG === 'female' && team.gender === 'male') continue;
+                    if (reqG === 'male' && team.gender === 'female') continue;
+                    combinations.push({ teamIdx: bestTeamIdx, tripIdx: j, team: team, trip: todaysTrips[j] });
+                }
+
+                if (combinations.length === 0) {
+                    availableTeams.shift();
+                    continue;
                 }
 
                 // 트래픽 과부하 방지 (Throttling / Chunking)
@@ -437,11 +523,11 @@ async function calculateOptimizedRoute() {
 
                 let bestCombo = combinations.reduce((min, curr) => curr.duration < min.duration ? curr : min, {duration: Infinity});
 
-                let selectedTeam = teams[bestCombo.teamIdx];
                 let selectedTrip = todaysTrips.splice(bestCombo.tripIdx, 1)[0];
-                selectedTeam.route.push(selectedTrip);
-                selectedTeam.lastPoint = selectedTrip;
-                availableTeams = availableTeams.filter(idx => idx !== bestCombo.teamIdx);
+                team.route.push(selectedTrip);
+                team.lastPoint = selectedTrip;
+                team.simulatedDuration += bestCombo.duration; // 누적 운전 시간 갱신
+                availableTeams.shift();
             }
             if (todaysTrips.length > 0) skippedTrips.push(...todaysTrips);
         }
@@ -510,8 +596,29 @@ async function calculateOptimizedRoute() {
         headerLi.className = 'route-team-header';
         headerLi.style.borderColor = color;
         headerLi.style.color = color;
-        headerLi.innerHTML = `<span class="material-symbols-rounded">local_shipping</span> ${teamData.teamId}팀 배정 동선 <span style="margin-left:auto; font-size:0.85rem; color:var(--text-muted); font-weight:normal;">총 이동: <b style="color:${color}; font-size:1.1rem;">${teamData.totalDistance.toFixed(1)}km</b> (${durationText})</span>`;
+        const naviBtnId = `navi-btn-${teamData.teamId}`;
+        headerLi.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; width:100%; flex-wrap:wrap; gap:0.5rem;">
+                <span><span class="material-symbols-rounded">local_shipping</span> ${teamData.teamId}팀 배정 <span style="font-size:0.85rem; color:var(--text-muted); font-weight:normal;">(총 ${teamData.totalDistance.toFixed(1)}km / ${durationText})</span></span>
+                <button id="${naviBtnId}" style="background-color:#FEE500; color:#000000; border:none; padding:0.3rem 0.6rem; font-size:0.85rem; display:flex; align-items:center; gap:4px; font-weight:bold; border-radius:6px; cursor:pointer;"><span class="material-symbols-rounded" style="font-size:1.1em;">navigation</span> 카카오내비 전송</button>
+            </div>
+        `;
         listEl.appendChild(headerLi);
+        
+        // 모바일 카카오내비 다중 경유지 전송 클릭 이벤트
+        const naviBtn = document.getElementById(naviBtnId);
+        naviBtn.onclick = () => {
+            if (typeof Kakao === 'undefined' || !Kakao.Navi) {
+                showToast('카카오내비 연동을 불러오지 못했습니다. 새로고침 후 다시 시도해주세요.', 'warning');
+                return;
+            }
+            if (teamData.route.length === 0) return;
+            // 카카오내비는 최대 3개의 경유지만 허용하므로 앞 3개만 자르고 나머지는 무시
+            let dest = teamData.route[teamData.route.length - 1];
+            let vias = teamData.route.slice(0, teamData.route.length - 1).slice(0, 3).map(t => ({ name: t.name, x: t.lng, y: t.lat }));
+            
+            Kakao.Navi.start({ name: dest.name, x: dest.lng, y: dest.lat, viaPoints: vias });
+        };
 
         let currentRenderDate = null;
         let tripNumber = 1; // 순번 카운터

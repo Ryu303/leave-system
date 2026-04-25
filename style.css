@@ -304,37 +304,37 @@ button:disabled {
 
 .task-input-area {
     display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1.5rem;
+    gap: 0.8rem;
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    box-shadow: var(--shadow-sm);
+    align-items: center;
     flex-wrap: wrap;
 }
 
 .task-input-area input {
-    flex: 2;
-    padding: 0.75rem 1rem;
-    border: 1px solid transparent;
-    border-radius: 10px;
+    padding: 0.8rem 1.2rem;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
     font-size: 0.95rem;
     outline: none;
     background-color: var(--col-bg);
-    transition: border-color 0.2s;
-}
-
-#assigneeInput {
-    flex: 1;
-    min-width: 100px;
+    transition: all 0.2s ease;
 }
 
 #priorityInput {
-    padding: 0.75rem;
-    border: 1px solid transparent;
-    border-radius: 10px;
+    padding: 0.8rem 1.2rem;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
     font-size: 0.95rem;
     outline: none;
     background-color: var(--col-bg);
     color: var(--text-main);
     cursor: pointer;
-    transition: border-color 0.2s;
+    transition: all 0.2s ease;
 }
 
 .task-input-area input:focus, #priorityInput:focus {

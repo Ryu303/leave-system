@@ -256,7 +256,8 @@ function downloadLeaveCSV() {
 }
 
 let previousPendingLeaves = new Set(), isFirstLeavesLoad = true;
-db.ref('leaves').on('value', (s) => {
+// 휴가 데이터 최적화: 최신 300개만 로드
+db.ref('leaves').orderByKey().limitToLast(300).on('value', (s) => {
     const data = s.val() || {}; 
     for(let key in data) data[key].id = key; 
     AppStore.setLeaves(data);
@@ -311,7 +312,11 @@ function renderMyPage() {
         tasksList.appendChild(li);
     });
     Object.values(AppStore.getTrips()).filter(t => isMatched(t.assignee)).forEach(t => {
-        const li = document.createElement('li'); li.innerHTML = `<div style="font-weight:600;">${t.name}</div><div style="font-size:0.8rem;">날짜: ${t.date || '미정'}</div>`; li.onclick = () => openTripModal(t.id, t.name, t.date, t.assignee); tripsList.appendChild(li);
+        let reqGender = t.requiredGender || (t.requiresFemale ? 'female' : 'any');
+        let reqPers = t.requiredPersonnel || 1;
+        const femaleBadge = reqGender === 'female' ? ' 👩‍💼' : (reqGender === 'male' ? ' 👨‍💼' : '');
+        const persBadge = `<span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal; margin-left:4px;">[${reqPers}명]</span>`;
+        const li = document.createElement('li'); li.innerHTML = `<div style="font-weight:600;">${t.name}${persBadge}${femaleBadge}</div><div style="font-size:0.8rem;">날짜: ${t.date || '미정'}</div>`; li.onclick = () => openTripModal(t.id, t.name, t.date, t.assignee); tripsList.appendChild(li);
     });
     
     // 마이페이지의 내 휴가 결재 섹션에는 '승인된(approved)' 휴가만 노출되도록 필터링
@@ -388,8 +393,9 @@ async function uploadFile() {
 
     document.getElementById('uploadStatus').innerText = '업로드 중...';
     const filePath = 'uploads/' + Date.now() + '_' + file.name;
+    const uploaderName = AppStore.getCurrentUser() ? AppStore.getCurrentUser().displayName : '익명';
     storage.ref(filePath).put(file).then(snapshot => snapshot.ref.getDownloadURL().then(url => {
-        db.ref('files').push().set({ id: Date.now().toString(), name: file.name, url: url, path: filePath, timestamp: Date.now() });
+        db.ref('files').push().set({ id: Date.now().toString(), name: file.name, url: url, path: filePath, timestamp: Date.now(), uploader: uploaderName });
         document.getElementById('uploadStatus').innerText = '업로드 완료!'; fileInput.value = ''; updateFileName('fileInput', 'fileNameDisplay');
     })).catch(e => document.getElementById('uploadStatus').innerText = '업로드 실패');
 }
@@ -397,12 +403,13 @@ async function deleteFile(fileId, filePath) {
     if (!await customConfirm('삭제하시겠습니까?')) return;
     storage.ref(filePath).delete().then(() => db.ref('files/' + fileId).remove());
 }
-db.ref('files').on('value', (s) => {
+// 파일 목록 최적화: 최신 100개만 로드
+db.ref('files').orderByKey().limitToLast(100).on('value', (s) => {
     const list = document.getElementById('fileList'); list.innerHTML = '';
     const data = s.val(); if (!data) return;
     for(let key in data) data[key].id = key; // 진짜 DB 키로 강제 동기화
     Object.values(data).sort((a,b) => b.timestamp - a.timestamp).forEach(f => {
-        const li = document.createElement('li'); li.innerHTML = `<a href="${f.url}" target="_blank">${f.name}</a> ${f.path ? `<button class="delete-btn" onclick="deleteFile('${f.id}', '${f.path}')">삭제</button>` : ''}`;
+        const li = document.createElement('li'); li.innerHTML = `<a href="${f.url}" target="_blank" title="업로드: ${f.uploader || '알 수 없음'}">${f.name}</a> ${f.path ? `<button class="delete-btn" onclick="deleteFile('${f.id}', '${f.path}')">삭제</button>` : ''}`;
         list.appendChild(li);
     });
 });
@@ -550,7 +557,8 @@ async function saveNotice() {
 async function deleteNotice() { if (await customConfirm('삭제하시겠습니까?')) { db.ref('notices/' + currentNoticeId).remove(); closeNoticeModal(); } }
 
 // 공지사항 데이터 실시간 동기화
-db.ref('notices').on('value', (s) => { 
+// 공지사항 최적화: 최신 50개만 로드
+db.ref('notices').orderByKey().limitToLast(50).on('value', (s) => { 
     const data = s.val() || {};
     for(let key in data) data[key].id = key; 
     AppStore.setNotices(data);

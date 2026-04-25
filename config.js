@@ -233,3 +233,8 @@ function switchTab(tabId, element) {
         if (typeof renderMyPage === 'function') renderMyPage();
     }
 }
+
+// 카카오내비 전송을 위한 SDK 초기화
+if (typeof Kakao !== 'undefined' && !Kakao.isInitialized()) {
+    Kakao.init('49567b3deb7ec9afb54384571d730980'); // 카카오 앱 키
+}
