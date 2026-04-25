@@ -37,6 +37,7 @@ async function applyLeave() {
     try {
         await Promise.all(dates.map(d => { 
             const ref = db.ref('leaves').push(); 
+            const currentUserProfile = AppStore.getCurrentUser();
             return ref.set({ id: ref.key, uid: auth.currentUser.uid, userName: currentUserProfile.displayName, date: d, type: deduction, subType: isRange ? '1' : typeVal, status: 'pending', timestamp: Date.now() }); 
         }));
         
@@ -52,13 +53,27 @@ async function applyLeave() {
 }
 
 function renderLeaveUI() {
+    const currentUserProfile = AppStore.getCurrentUser();
     if (!auth.currentUser || !currentUserProfile) return;
-    let used = 0; const myLeaves = Object.values(globalLeavesData).filter(l => l.uid === auth.currentUser.uid);
+    let used = 0; const myLeaves = Object.values(AppStore.getLeaves()).filter(l => l.uid === auth.currentUser.uid);
     myLeaves.forEach(l => { if (l.status === 'approved' || l.status === 'pending' || l.status === 'cancel_requested') used += l.type; });
     document.getElementById('leave-remain').textContent = ((currentUserProfile.leaveTotal || 15) - used).toFixed(1);
     document.getElementById('leave-used').textContent = used.toFixed(1);
     const listEl = document.getElementById('leave-history-list'); listEl.innerHTML = '';
+    
+    const now = Date.now();
+    const todayTime = new Date().setHours(0,0,0,0);
+    const threeDaysMs = 3 * 24 * 60 * 60 * 1000; // 3일을 밀리초로 변환
+
     myLeaves.sort((a,b) => b.timestamp - a.timestamp).forEach(l => {
+        // 3일이 지난 기록은 내역에서 자동으로 숨김 처리
+        if (l.status === 'approved') {
+            const leaveTime = new Date(l.date).setHours(0,0,0,0);
+            if ((todayTime - leaveTime) >= threeDaysMs) return; // 휴가일 기준 3일 경과 시 숨김
+        } else if (l.status === 'rejected' || l.status === 'canceled') {
+            if ((now - l.timestamp) >= threeDaysMs) return; // 반려/취소는 신청일 기준 3일 경과 시 숨김
+        }
+
         const li = document.createElement('li'); 
         let statusText = l.status === 'approved' ? '승인됨' : (l.status === 'pending' ? '승인 대기중' : (l.status === 'cancel_requested' ? '취소 대기중' : (l.status === 'rejected' ? '반려됨' : '취소됨')));
         let color = l.status === 'approved' ? '#10B981' : (l.status === 'rejected' || l.status === 'cancel_requested' ? 'var(--danger)' : '#F59E0B');
@@ -69,8 +84,8 @@ function renderLeaveUI() {
 }
 
 async function cancelLeave(id) { 
-    if (await customConfirm('휴가를 취소하시겠습니까?')) {
-        const leave = globalLeavesData[id];
+    if (await customConfirm('휴가를 취소하시겠습니까?\n\n※ 휴가 취소는 담당자에게 보고 후 등록해주세요.')) {
+        const leave = AppStore.getLeaves()[id];
         if (!leave) return;
         
         // 1. 즉각적인 시각적 상호작용 (버튼 비활성화 및 텍스트 변경)
@@ -101,11 +116,11 @@ function renderAdminLeaves() {
     const listEl = document.getElementById('admin-leave-list');
     if (listEl) {
         listEl.innerHTML = '';
-        Object.keys(globalUsersData).forEach(uid => {
-            const u = globalUsersData[uid];
+        Object.keys(AppStore.getUsers()).forEach(uid => {
+            const u = AppStore.getUsers()[uid];
             if (!u.approved) return;
             let used = 0;
-            Object.values(globalLeavesData).forEach(l => {
+            Object.values(AppStore.getLeaves()).forEach(l => {
                 if (l.uid === uid && (l.status === 'approved' || l.status === 'pending' || l.status === 'cancel_requested')) used += l.type;
             });
             const total = u.leaveTotal || 15;
@@ -117,7 +132,7 @@ function renderAdminLeaves() {
     }
     
     // 휴가 결재 대기 목록 렌더링 로직
-    const pendingLeaves = Object.values(globalLeavesData).filter(l => l.status === 'pending' || l.status === 'cancel_requested');
+    const pendingLeaves = Object.values(AppStore.getLeaves()).filter(l => l.status === 'pending' || l.status === 'cancel_requested');
     let pendingHTML = '';
     if (pendingLeaves.length === 0) {
         pendingHTML = '<li style="justify-content: center; color: var(--text-muted); font-size: 0.9rem; background-color: transparent; border: 1px dashed var(--border-color);">대기 중인 결재 건이 없습니다.</li>';
@@ -170,18 +185,83 @@ async function adminEditTotalLeave(uid, currentTotal) {
     const newTotal = await customPrompt('연차 개수 설정:', currentTotal);
     if (newTotal) db.ref('users/' + uid).update({ leaveTotal: parseFloat(newTotal) });
 }
-function downloadLeaveCSV() { customAlert('CSV 다운로드 기능 실행'); }
+
+function downloadLeaveCSV() {
+    const leavesData = AppStore.getLeaves();
+    if (!leavesData || Object.keys(leavesData).length === 0) {
+        showToast('다운로드할 휴가 내역이 없습니다.', 'warning');
+        return;
+    }
+
+    const usersData = AppStore.getUsers();
+    const userStats = {};
+
+    // 사용자별 기본 연차 세팅
+    Object.keys(usersData).forEach(uid => {
+        userStats[uid] = { total: usersData[uid].leaveTotal || 15, used: 0 };
+    });
+
+    // 사용자별 사용 연차 일괄 계산
+    Object.values(leavesData).forEach(l => {
+        if (l.uid && userStats[l.uid]) {
+            if (l.status === 'approved' || l.status === 'pending' || l.status === 'cancel_requested') {
+                userStats[l.uid].used += l.type;
+            }
+        }
+    });
+
+    // 한글 깨짐 방지를 위한 BOM(\uFEFF) 추가
+    let csvContent = "\uFEFF결재 상태,이름,날짜,휴가 구분,차감 일수,현재 잔여 연차,비고\n";
+
+    // 카테고리(상태)별로 먼저 그룹핑하고, 그 안에서 최신순 정렬
+    const leavesArray = Object.values(leavesData).sort((a, b) => {
+        const statusOrder = { 'approved': 1, 'rejected': 2, 'pending': 3, 'cancel_requested': 4, 'canceled': 5 };
+        const orderA = statusOrder[a.status] || 99;
+        const orderB = statusOrder[b.status] || 99;
+        if (orderA !== orderB) return orderA - orderB;
+        return b.timestamp - a.timestamp;
+    });
+
+    leavesArray.forEach(l => {
+        const name = l.userName || '알 수 없음';
+        const date = l.date || '';
+        const typeText = l.type === 1 ? '연차(1일)' : (l.subType === '0.5am' ? '오전 반차' : '오후 반차');
+        const typeNum = l.type || 0;
+        
+        // 개별 팀원의 잔여 연차 매핑
+        let remainDays = '-';
+        if (l.uid && userStats[l.uid]) {
+            remainDays = (userStats[l.uid].total - userStats[l.uid].used).toFixed(1) + '일';
+        }
+
+        let statusText = l.status === 'approved' ? '승인됨' : (l.status === 'pending' ? '대기중' : (l.status === 'cancel_requested' ? '취소 대기중' : (l.status === 'rejected' ? '반려됨' : '취소됨')));
+        const note = l.rejectReason ? `반려사유: ${l.rejectReason}` : '';
+
+        // CSV 형식에 맞게 문자열 내 쉼표, 따옴표 이스케이프 처리
+        const safeName = `"${name.replace(/"/g, '""')}"`;
+        const safeNote = `"${note.replace(/"/g, '""')}"`;
+
+        csvContent += `${statusText},${safeName},${date},${typeText},${typeNum},${remainDays},${safeNote}\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `휴가_결재_내역_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast('휴가 내역 엑셀(CSV) 다운로드가 시작되었습니다.', 'info');
+}
 
 let previousPendingLeaves = new Set(), isFirstLeavesLoad = true;
 db.ref('leaves').on('value', (s) => {
-    globalLeavesData = s.val() || {}; 
-    for(let key in globalLeavesData) globalLeavesData[key].id = key; // 파이어베이스 키 강제 동기화 (오류 방지)
-    if (typeof renderTasks === 'function') renderTasks(); 
-    renderLeaveUI(); 
-    renderMyPage();
+    const data = s.val() || {}; 
+    for(let key in data) data[key].id = key; 
+    AppStore.setLeaves(data);
     if (auth.currentUser && auth.currentUser.uid === ADMIN_UID) {
-        renderAdminLeaves();
-        Object.values(globalLeavesData).forEach(l => { if (l.status === 'pending' && !isFirstLeavesLoad && !previousPendingLeaves.has(l.id)) showToast(`🚨 휴가 신청: ${l.userName}`, 'warning'); previousPendingLeaves.add(l.id); });
+        Object.values(data).forEach(l => { if (l.status === 'pending' && !isFirstLeavesLoad && !previousPendingLeaves.has(l.id)) showToast(`🚨 휴가 신청: ${l.userName}`, 'warning'); previousPendingLeaves.add(l.id); });
     }
     isFirstLeavesLoad = false;
 });
@@ -189,6 +269,7 @@ db.ref('leaves').on('value', (s) => {
 function changeMyPageMonth(offset) { currentDateForMyPageCalendar.setMonth(currentDateForMyPageCalendar.getMonth() + offset); renderMyPage(); }
 
 function renderMyPage() {
+    const currentUserProfile = AppStore.getCurrentUser();
     const tasksList = document.getElementById('mypage-tasks'), tripsList = document.getElementById('mypage-trips'), leavesList = document.getElementById('mypage-leaves-list');
     const calGrid = document.getElementById('mypage-calendar-grid');
     if (!tasksList) return; tasksList.innerHTML = ''; tripsList.innerHTML = ''; if (leavesList) leavesList.innerHTML = ''; if(calGrid) calGrid.innerHTML = '';
@@ -212,20 +293,35 @@ function renderMyPage() {
     const myName = currentUserProfile.displayName.replace(/\s+/g, '').toLowerCase();
     const isMatched = (str) => str && str.split(/[,/]+/).map(s => s.replace(/\s+/g, '').toLowerCase()).some(n => n.includes(myName) || myName.includes(n));
     
-    Object.values(globalTasksData).filter(t => isMatched(t.assignee)).forEach(t => {
-        const li = document.createElement('li'); li.innerHTML = `<div style="font-weight:600;">${t.title}</div><div style="font-size:0.8rem;">마감: ${t.dueDate || '미정'}</div>`; li.onclick = () => openModal(t.id, t.title, t.description, t.dueDate, t.startDate); tasksList.appendChild(li);
+    Object.values(AppStore.getTasks()).filter(t => isMatched(t.assignee)).forEach(t => {
+        const li = document.createElement('li'); 
+        li.style.display = 'flex'; li.style.justifyContent = 'space-between'; li.style.alignItems = 'center';
+        
+        const statusText = t.status === 'todo' ? '해야 할 일' : (t.status === 'doing' ? '진행 중' : '완료');
+        const statusColor = t.status === 'todo' ? 'var(--text-muted)' : (t.status === 'doing' ? '#F59E0B' : '#10B981');
+        
+        li.innerHTML = `<div style="flex:1; cursor:pointer;" class="mypage-task-info"><div style="font-weight:600;">${t.title}</div><div style="font-size:0.8rem;">마감: ${t.dueDate || '미정'}</div></div><button class="status-cycle-btn" style="background-color: ${statusColor}15; color: ${statusColor}; border: 1px solid ${statusColor}; padding: 0.3rem 0.6rem; font-size: 0.75rem; border-radius: 4px; box-shadow: none; flex-shrink: 0; margin-left: 0.5rem;" title="클릭하여 상태 변경">${statusText}</button>`;
+        
+        li.querySelector('.mypage-task-info').onclick = () => openModal(t.id, t.title, t.description, t.dueDate, t.startDate);
+        li.querySelector('.status-cycle-btn').onclick = (e) => {
+            e.stopPropagation();
+            const nextStatus = t.status === 'todo' ? 'doing' : (t.status === 'doing' ? 'done' : 'todo');
+            db.ref('tasks/' + t.id).update({ status: nextStatus });
+        };
+        tasksList.appendChild(li);
     });
-    Object.values(globalTripsData).filter(t => isMatched(t.assignee)).forEach(t => {
+    Object.values(AppStore.getTrips()).filter(t => isMatched(t.assignee)).forEach(t => {
         const li = document.createElement('li'); li.innerHTML = `<div style="font-weight:600;">${t.name}</div><div style="font-size:0.8rem;">날짜: ${t.date || '미정'}</div>`; li.onclick = () => openTripModal(t.id, t.name, t.date, t.assignee); tripsList.appendChild(li);
     });
     
-    const myLeaves = Object.values(globalLeavesData).filter(l => l.uid === auth.currentUser.uid);
+    // 마이페이지의 내 휴가 결재 섹션에는 '승인된(approved)' 휴가만 노출되도록 필터링
+    const myLeaves = Object.values(AppStore.getLeaves()).filter(l => l.uid === auth.currentUser.uid && l.status === 'approved');
     
     if (leavesList) {
         myLeaves.sort((a,b) => b.timestamp - a.timestamp).forEach(l => {
             const li = document.createElement('li'); 
-            let statusText = l.status === 'approved' ? '승인됨' : (l.status === 'pending' ? '대기중' : (l.status === 'cancel_requested' ? '취소 대기중' : (l.status === 'rejected' ? '반려됨' : l.status)));
-            let color = l.status === 'approved' ? '#10B981' : (l.status === 'rejected' ? 'var(--danger)' : '#F59E0B');
+            let statusText = '승인됨';
+            let color = '#10B981';
             let reasonHtml = l.rejectReason ? `<div style="font-size:0.75rem; color:var(--danger); margin-top:2px;">사유: ${l.rejectReason}</div>` : '';
             li.innerHTML = `<div><div style="font-weight:600; font-size:0.9rem;">${l.date}</div><div style="font-size:0.75rem; color:${color}">${statusText} (${l.type}일)</div>${reasonHtml}</div>`; 
             leavesList.appendChild(li);
@@ -258,6 +354,7 @@ const quill = new Quill('#editor-container', {
 });
 
 quill.on('text-change', function(delta, oldDelta, source) {
+    const currentUserProfile = AppStore.getCurrentUser();
     if (source === 'user') {
         if (!currentUserProfile || !currentUserProfile.approved) return;
         isTyping = true;
@@ -272,6 +369,7 @@ db.ref('sharedNote').on('value', (snapshot) => {
     if (!isTyping) { const content = snapshot.val() || ''; if (quill.root.innerHTML !== content) quill.root.innerHTML = content; }
 });
 db.ref('typingStatus').on('value', (snapshot) => {
+    const currentUserProfile = AppStore.getCurrentUser();
     const indicator = document.getElementById('typing-indicator'), data = snapshot.val();
     if (data && data.name && (Date.now() - data.time < 3000)) {
         if (currentUserProfile && data.name === currentUserProfile.displayName) return indicator.classList.remove('active');
@@ -313,11 +411,7 @@ db.ref('files').on('value', (s) => {
 // 조직도(팀원 목록) 및 채팅 기능
 // ----------------------------------------------------
 db.ref('users').on('value', (snapshot) => { 
-    globalUsersData = snapshot.val() || {}; 
-    renderMembersDirectory(); 
-    renderChatList(); 
-    setupPrivateChatNotificationListeners(); 
-    if (auth.currentUser && auth.currentUser.uid === ADMIN_UID && typeof renderAdminLeaves === 'function') renderAdminLeaves();
+    AppStore.setUsers(snapshot.val() || {}); 
 });
 
 function renderMembersDirectory() {
@@ -326,8 +420,8 @@ function renderMembersDirectory() {
     const isAdmin = auth.currentUser.uid === ADMIN_UID;
     if (document.getElementById('org-admin-guide')) document.getElementById('org-admin-guide').style.display = isAdmin ? 'block' : 'none';
 
-    Object.keys(globalUsersData).forEach(uid => {
-        const u = globalUsersData[uid]; if (!u.approved) return;
+    Object.keys(AppStore.getUsers()).forEach(uid => {
+        const u = AppStore.getUsers()[uid]; if (!u.approved) return;
         const card = document.createElement('div'); card.className = 'org-card' + (isAdmin ? ' draggable' : '');
         if (isAdmin) { card.draggable = true; card.ondragstart = (e) => e.dataTransfer.setData("uid", uid); }
         card.innerHTML = `<img src="${u.photoURL || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect width='1' height='1' fill='%23E5E7EB'/%3E%3C/svg%3E"}" style="width: 54px; height: 54px; border-radius: 50%; object-fit: cover;"><div style="flex:1;font-weight:800;font-size:1.1rem;">${u.displayName}</div>${uid !== auth.currentUser.uid ? `<button onclick="openPrivateChat('${uid}', '${u.displayName}')" class="delete-btn" style="background:var(--col-bg);color:var(--text-muted);"><span class="material-symbols-rounded">chat</span></button>` : ''}`;
@@ -367,6 +461,7 @@ function openPrivateChat(targetUid, targetName) {
 function closePrivateChat() { document.getElementById('private-chat-window').style.display = 'none'; if (currentPrivateChatRef) currentPrivateChatRef.off(); currentPrivateChatTargetUid = null; }
 function handlePrivateChatEnter(event) { if (event.key === 'Enter') { event.preventDefault(); sendPrivateMessage(); } }
 async function sendPrivateMessage() {
+    const currentUserProfile = AppStore.getCurrentUser();
     const text = document.getElementById('private-chat-input').value.trim(); if (!text || !currentPrivateChatTargetUid) return;
     db.ref(`privateChats/${getPrivateChatId(auth.currentUser.uid, currentPrivateChatTargetUid)}`).push({ uid: auth.currentUser.uid, sender: currentUserProfile.displayName, text: text, timestamp: Date.now() });
     document.getElementById('private-chat-input').value = '';
@@ -381,21 +476,23 @@ function backToChatList() { document.getElementById('chat-window').style.display
 function openGroupChat() { document.getElementById('chat-list-window').style.display = 'none'; document.getElementById('chat-window').style.display = 'flex'; setTimeout(() => document.getElementById('chat-input').focus(), 100); }
 
 function renderChatList() {
+    const currentUserProfile = AppStore.getCurrentUser();
     const listBody = document.getElementById('chat-list-body'); if (!listBody) return; listBody.innerHTML = '';
     if (!auth.currentUser || !currentUserProfile || !currentUserProfile.approved) return;
     
     const groupItem = document.createElement('div'); groupItem.className = 'chat-list-item'; groupItem.onclick = openGroupChat;
     groupItem.innerHTML = `<div style="width:48px;height:48px;border-radius:18px;background:var(--primary);color:white;display:flex;justify-content:center;align-items:center;margin-right:12px;"><span class="material-symbols-rounded">groups</span></div><div style="flex:1;font-weight:700;">사내 단체 채팅방</div>`; listBody.appendChild(groupItem);
     
-    Object.keys(globalUsersData).forEach(uid => {
+    Object.keys(AppStore.getUsers()).forEach(uid => {
         if (uid === auth.currentUser.uid) return;
-        const u = globalUsersData[uid]; if (!u.approved) return;
+        const u = AppStore.getUsers()[uid]; if (!u.approved) return;
         const item = document.createElement('div'); item.className = 'chat-list-item'; item.onclick = () => openPrivateChat(uid, u.displayName);
         item.innerHTML = `<img src="${u.photoURL || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect width='1' height='1' fill='%23E5E7EB'/%3E%3C/svg%3E"}" style="width:48px;height:48px;border-radius:18px;margin-right:12px; object-fit: cover;"><div style="flex:1;font-weight:600;">${u.displayName}</div>`; listBody.appendChild(item);
     });
 }
 function handleChatEnter(event) { if (event.key === 'Enter') { event.preventDefault(); sendChatMessage(); } }
 async function sendChatMessage() {
+    const currentUserProfile = AppStore.getCurrentUser();
     const text = document.getElementById('chat-input').value.trim(); if (!text) return;
     db.ref('chatMessages').push({ uid: auth.currentUser.uid, sender: currentUserProfile.displayName, text: text, timestamp: Date.now() });
     document.getElementById('chat-input').value = '';
@@ -413,15 +510,15 @@ db.ref('chatMessages').orderByChild('timestamp').limitToLast(50).on('value', (s)
 let privateChatListeners = {}, initTimeForPrivateChats = Date.now();
 function setupPrivateChatNotificationListeners() {
     const currentUid = auth.currentUser ? auth.currentUser.uid : null; if (!currentUid) return;
-    Object.keys(globalUsersData).forEach(targetUid => {
+    Object.keys(AppStore.getUsers()).forEach(targetUid => {
         if (targetUid === currentUid) return;
         const chatId = getPrivateChatId(currentUid, targetUid);
         if (!privateChatListeners[chatId]) {
             db.ref(`privateChats/${chatId}`).limitToLast(1).on('child_added', (s) => {
                 const msg = s.val();
                 if (msg && msg.uid !== currentUid && msg.timestamp > initTimeForPrivateChats) {
-                    showToast(`💬 ${globalUsersData[targetUid].displayName}님:\n${msg.text}`, 'info');
-                    if (currentPrivateChatTargetUid !== targetUid) openPrivateChat(targetUid, globalUsersData[targetUid].displayName);
+                    showToast(`💬 ${AppStore.getUsers()[targetUid].displayName}님:\n${msg.text}`, 'info');
+                    if (currentPrivateChatTargetUid !== targetUid) openPrivateChat(targetUid, AppStore.getUsers()[targetUid].displayName);
                 }
             });
             privateChatListeners[chatId] = true;
@@ -435,17 +532,18 @@ function setupPrivateChatNotificationListeners() {
 let currentNoticeId = null;
 function renderNotices() {
     const listEl = document.getElementById('notice-list'); if (!listEl) return; listEl.innerHTML = '';
-    Object.values(globalNoticesData).sort((a,b) => b.timestamp - a.timestamp).forEach(notice => {
+    Object.values(AppStore.getNotices()).sort((a,b) => b.timestamp - a.timestamp).forEach(notice => {
         const li = document.createElement('li'); li.className = 'notice-item'; li.innerHTML = `<div class="notice-item-title">${notice.title}</div><div class="notice-item-author">${notice.author}</div>`;
         li.onclick = () => viewNotice(notice.id); listEl.appendChild(li);
     });
 }
-function viewNotice(id) { const notice = globalNoticesData[id]; currentNoticeId = id; document.getElementById('noticeTitleInput').value = notice.title; document.getElementById('noticeContentInput').value = notice.content; document.getElementById('noticeModal').style.display = 'flex'; db.ref('notices/' + id + '/views').set((notice.views || 0) + 1); }
+function viewNotice(id) { const notice = AppStore.getNotices()[id]; currentNoticeId = id; document.getElementById('noticeTitleInput').value = notice.title; document.getElementById('noticeContentInput').value = notice.content; document.getElementById('noticeModal').style.display = 'flex'; db.ref('notices/' + id + '/views').set((notice.views || 0) + 1); }
 function openNoticeModal() { currentNoticeId = null; document.getElementById('noticeTitleInput').value = ''; document.getElementById('noticeContentInput').value = ''; document.getElementById('noticeModal').style.display = 'flex'; }
 function closeNoticeModal() { document.getElementById('noticeModal').style.display = 'none'; currentNoticeId = null; }
 async function saveNotice() {
+    const currentUserProfile = AppStore.getCurrentUser();
     const title = document.getElementById('noticeTitleInput').value.trim(), content = document.getElementById('noticeContentInput').value.trim(); if (!title || !content) return;
-    const data = { title: title, content: content, author: currentUserProfile.displayName, uid: auth.currentUser.uid, timestamp: currentNoticeId ? globalNoticesData[currentNoticeId].timestamp : Date.now(), views: currentNoticeId ? globalNoticesData[currentNoticeId].views : 0 };
+    const data = { title: title, content: content, author: currentUserProfile.displayName, uid: auth.currentUser.uid, timestamp: currentNoticeId ? AppStore.getNotices()[currentNoticeId].timestamp : Date.now(), views: currentNoticeId ? AppStore.getNotices()[currentNoticeId].views : 0 };
     if (currentNoticeId) db.ref('notices/' + currentNoticeId).update(data); else { const ref = db.ref('notices').push(); data.id = ref.key; ref.set(data); }
     closeNoticeModal();
 }
@@ -453,7 +551,7 @@ async function deleteNotice() { if (await customConfirm('삭제하시겠습니�
 
 // 공지사항 데이터 실시간 동기화
 db.ref('notices').on('value', (s) => { 
-    globalNoticesData = s.val() || {};
-    for(let key in globalNoticesData) globalNoticesData[key].id = key; // 진짜 DB 키로 강제 동기화
-    renderNotices(); 
+    const data = s.val() || {};
+    for(let key in data) data[key].id = key; 
+    AppStore.setNotices(data);
 });

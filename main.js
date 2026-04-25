@@ -23,25 +23,29 @@ auth.onAuthStateChanged((user) => {
     if (user) {
         const userRef = db.ref('users/' + user.uid);
         userRef.on('value', (snapshot) => {
+            let profileData;
+            
             if (!snapshot.exists()) {
-                const newProfile = {
+                profileData = {
                     displayName: user.displayName, email: user.email, photoURL: user.photoURL || '',
-                    approved: user.uid === ADMIN_UID, leaveTotal: 15
+                    approved: false, leaveTotal: 15
                 };
-                userRef.set(newProfile);
-                currentUserProfile = newProfile;
+                userRef.set(profileData);
             } else {
-                currentUserProfile = snapshot.val();
-                if (user.uid === ADMIN_UID && !currentUserProfile.approved) {
+                profileData = snapshot.val();
+                if (user.uid === ADMIN_UID && !profileData.approved) {
                     db.ref('users/' + user.uid).update({ approved: true });
-                    currentUserProfile.approved = true;
+                    profileData.approved = true;
                 }
             }
+            
+            AppStore.setCurrentUser(profileData);
+
             if(typeof renderLeaveUI === 'function') renderLeaveUI();
             if(typeof renderMyPage === 'function') renderMyPage();
             if(typeof setupPrivateChatNotificationListeners === 'function') setupPrivateChatNotificationListeners();
 
-            updateUIPermissions(user, currentUserProfile);
+            updateUIPermissions(user, AppStore.getCurrentUser());
 
             if (user.uid === ADMIN_UID) {
                 document.getElementById('tab-btn-admin').style.display = 'inline-block';
@@ -52,7 +56,8 @@ auth.onAuthStateChanged((user) => {
             }
         });
     } else {
-        currentUserProfile = null;
+        // 로그아웃 시 AppStore 초기화
+        AppStore.setCurrentUser(null);
         updateUIPermissions(null, null);
         if (document.getElementById('tab-btn-admin')) document.getElementById('tab-btn-admin').style.display = 'none';
         if(typeof renderMyPage === 'function') renderMyPage();
@@ -156,6 +161,7 @@ async function revokeUser(uid, name) {
 }
 
 function openProfileModal() {
+    const currentUserProfile = AppStore.getCurrentUser();
     if (!currentUserProfile) return;
     document.getElementById('profileNameInput').value = currentUserProfile.displayName || '';
     document.getElementById('profileDeptInput').value = currentUserProfile.department || 'unassigned';

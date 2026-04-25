@@ -3,13 +3,72 @@
 // 전역 변수 (Global Variables)
 // ----------------------------------------------------
 const ADMIN_UID = "jaGugunGReXytCgbqYwQUybxyJL2"; 
-let currentUserProfile = null;
-let globalTasksData = {};
-let globalTripsData = {};
-let globalLeavesData = {};
-let globalUsersData = {};
-let globalNoticesData = {};
-let currentViewMode = 'status';
+
+const AppStore = {
+    state: {
+        currentUserProfile: null,
+        tasks: {},
+        trips: {},
+        leaves: {},
+        users: {},
+        notices: {},
+        viewMode: 'status'
+    },
+    getCurrentUser: function() { return this.state.currentUserProfile; },
+    setCurrentUser: function(profile) { this.state.currentUserProfile = profile; },
+    getTasks: function() { return this.state.tasks; },
+    setTasks: function(newData) {
+        this.state.tasks = newData;
+        if(typeof renderTasks === 'function') renderTasks();
+        if(typeof renderMyPage === 'function') renderMyPage();
+    },
+    mergeTasks: function(newData, status) {
+        Object.keys(this.state.tasks).forEach(key => {
+            if (this.state.tasks[key].status === status) {
+                delete this.state.tasks[key];
+            }
+        });
+        Object.assign(this.state.tasks, newData);
+        if(typeof renderTasks === 'function') renderTasks();
+        if(typeof renderMyPage === 'function') renderMyPage();
+    },
+    getTrips: function() { return this.state.trips; },
+    setTrips: function(newData) {
+        this.state.trips = newData;
+        if(typeof renderTasks === 'function') renderTasks();
+        if(typeof renderMyPage === 'function') renderMyPage();
+        if(typeof renderTripList === 'function') renderTripList();
+    },
+    getLeaves: function() { return this.state.leaves; },
+    setLeaves: function(newData) {
+        this.state.leaves = newData;
+        if(typeof renderTasks === 'function') renderTasks();
+        if(typeof renderLeaveUI === 'function') renderLeaveUI();
+        if(typeof renderMyPage === 'function') renderMyPage();
+        const user = firebase.auth().currentUser;
+        if(user && user.uid === ADMIN_UID && typeof renderAdminLeaves === 'function') renderAdminLeaves();
+    },
+    getUsers: function() { return this.state.users; },
+    setUsers: function(newData) {
+        this.state.users = newData;
+        if(typeof renderMembersDirectory === 'function') renderMembersDirectory();
+        if(typeof renderChatList === 'function') renderChatList();
+        if(typeof setupPrivateChatNotificationListeners === 'function') setupPrivateChatNotificationListeners();
+        const user = firebase.auth().currentUser;
+        if(user && user.uid === ADMIN_UID && typeof renderAdminLeaves === 'function') renderAdminLeaves();
+    },
+    getNotices: function() { return this.state.notices; },
+    setNotices: function(newData) {
+        this.state.notices = newData;
+        if(typeof renderNotices === 'function') renderNotices();
+    },
+    getViewMode: function() { return this.state.viewMode; },
+    setViewMode: function(mode) {
+        this.state.viewMode = mode;
+        if(typeof renderTasks === 'function') renderTasks();
+    }
+};
+
 let currentDateForCalendar = new Date();
 let currentDateForGantt = new Date();
 let currentDateForModalCalendar = new Date();
@@ -21,7 +80,8 @@ let currentDateForMyPageCalendar = new Date();
 const $ = (id) => document.getElementById(id);
 const $$ = (sel) => document.querySelectorAll(sel);
 const checkAuth = async (msg = '승인된 사용자만 이용할 수 있습니다.') => {
-    if (!currentUserProfile || !currentUserProfile.approved) { await customAlert(msg); return false; }
+    const profile = AppStore.getCurrentUser();
+    if (!profile || !profile.approved) { await customAlert(msg); return false; }
     return true;
 };
 

@@ -128,7 +128,7 @@ async function deleteTrip(id) {
     if (!await customConfirm('출장을 삭제하시겠습니까?')) return;
     
     try {
-        const trip = globalTripsData[id];
+        const trip = AppStore.getTrips()[id];
         if (trip && trip.schedulePath) storage.ref(trip.schedulePath).delete().catch(()=>{});
         
         await db.ref('businessTrips/' + id).remove();
@@ -143,11 +143,14 @@ document.getElementById('tripModal').addEventListener('keydown', (e) => {
 });
 
 db.ref('businessTrips').on('value', (s) => {
-    globalTripsData = s.val() || {}; 
-    for(let key in globalTripsData) globalTripsData[key].id = key; // 진짜 DB 키로 강제 동기화
-    renderTasks(); if(typeof renderMyPage === 'function') renderMyPage();
+    const data = s.val() || {}; 
+    for(let key in data) data[key].id = key; // 진짜 DB 키로 강제 동기화
+    AppStore.setTrips(data);
+});
+
+function renderTripList() {
     const list = document.getElementById('trip-list'); if (!list) return; list.innerHTML = '';
-    Object.values(globalTripsData).sort((a,b) => (a.date ? new Date(a.date).getTime() : Infinity) - (b.date ? new Date(b.date).getTime() : Infinity)).forEach(trip => {
+    Object.values(AppStore.getTrips()).sort((a,b) => (a.date ? new Date(a.date).getTime() : Infinity) - (b.date ? new Date(b.date).getTime() : Infinity)).forEach(trip => {
         const div = document.createElement('div'); div.className = 'trip-card';
         if (trip.date && new Date(trip.date).setHours(0,0,0,0) < new Date().setHours(0,0,0,0)) div.classList.add('past-trip');
         div.innerHTML = `<div class="trip-header"><div style="display:flex; align-items:flex-start; gap:10px;"><input type="checkbox" class="trip-checkbox" value="${trip.id}" style="width:18px; height:18px; margin-top:2px; cursor:pointer;" title="동선 최적화 선택"><div style="flex:1;"><div class="trip-title">${trip.name}</div><div class="trip-date">${trip.date}</div></div></div><div style="display:flex;gap:0.3rem;"><button class="delete-btn edit" style="padding:0.3rem;background:var(--col-bg);color:var(--text-main)"><span class="material-symbols-rounded">edit</span></button><button class="delete-btn del" style="padding:0.3rem"><span class="material-symbols-rounded">close</span></button></div></div><div class="trip-info-row">${trip.address}${trip.bookedHotel ? `<div style="color:#E63946; font-size:0.8rem; font-weight:bold; margin-top:4px;"><span class="material-symbols-rounded" style="font-size:1.1em; vertical-align:middle;">hotel</span> 예약 숙소: ${trip.bookedHotel}</div>` : ''}</div>`;
@@ -163,7 +166,7 @@ db.ref('businessTrips').on('value', (s) => {
         div.querySelector('.del').onclick = () => deleteTrip(trip.id);
         list.appendChild(div);
     });
-});
+}
 
 let tripMap = null;
 let mapPolylines = [];
@@ -180,12 +183,16 @@ function getHaversineDistance(lat1, lon1, lat2, lon2) {
 
 // 카카오 내비 API를 활용한 실제 도로 경로 및 거리 탐색 함수
 async function getRoadRoute(point1, point2) {
-    const KAKAO_REST_API_KEY = "9159f23f57165f61ac722d066d6f43b5";
-    const url = `https://apis-navi.kakaomobility.com/v1/directions?origin=${point1.lng},${point1.lat}&destination=${point2.lng},${point2.lat}`;
     try {
-        const res = await fetch(url, { headers: { 'Authorization': `KakaoAK ${KAKAO_REST_API_KEY}` } });
-        if (res.ok) {
-            const data = await res.json();
+        // 🔥 핵심 수정: 호출할 때 'asia-northeast3' (서울) 리전을 명시해야 해!
+        const getKakaoRoute = firebase.app().functions('asia-northeast3').httpsCallable('getKakaoRoute');
+        const res = await getKakaoRoute({
+            origin: { lat: point1.lat, lng: point1.lng },
+            destination: { lat: point2.lat, lng: point2.lng }
+        });
+        
+        if (res && res.data) {
+            const data = res.data;
             if (data.routes && data.routes.length > 0) {
                 const route = data.routes[0];
                 const distance = route.summary.distance / 1000; // 미터를 km로 변환
@@ -257,7 +264,7 @@ async function calculateOptimizedRoute() {
     // 1. 대상 출장지 수집
     if (checkedBoxes.length > 0) {
         const selectedIds = Array.from(checkedBoxes).map(cb => cb.value);
-        targetTrips = Object.values(globalTripsData).filter(t => selectedIds.includes(t.id) && t.address);
+        targetTrips = Object.values(AppStore.getTrips()).filter(t => selectedIds.includes(t.id) && t.address);
     } else {
         const assignee = document.getElementById('mapAssignee').value.trim().toLowerCase();
         const startDate = document.getElementById('mapStartDate').value;
@@ -266,7 +273,7 @@ async function calculateOptimizedRoute() {
         if (!assignee || !startDate || !endDate) return await customAlert('출장 목록에서 동선을 그릴 출장지를 체크(✔)하거나,\n검색할 담당자 이름과 기간을 모두 입력해주세요.');
         if (startDate > endDate) return await customAlert('시작일이 종료일보다 늦을 수 없습니다.');
 
-        targetTrips = Object.values(globalTripsData).filter(t => {
+        targetTrips = Object.values(AppStore.getTrips()).filter(t => {
             if (!t.date || !t.assignee || !t.address) return false;
             const tName = t.assignee.toLowerCase();
             return (tName.includes(assignee) || assignee.includes(tName)) && t.date >= startDate && t.date <= endDate;
@@ -410,15 +417,23 @@ async function calculateOptimizedRoute() {
                     }
                 }
 
-                // 남아있는 모든 경우의 수를 동시에 카카오 내비에 물어보고 가장 덜 막히는 길을 찾아냄
-                await Promise.all(combinations.map(async (combo) => {
-                    if (combo.team.lastPoint) {
-                        let roadData = await getRoadRoute(combo.team.lastPoint, combo.trip);
-                        combo.duration = roadData.duration;
-                    } else {
-                        combo.duration = (1000 - combo.trip.lat) * 3600; // 초기 위치가 없을 때 위도 기준 방어
-                    }
-                }));
+                // 트래픽 과부하 방지 (Throttling / Chunking)
+                // 한 번에 5개씩만 API를 호출하고 300ms의 대기 시간을 가집니다.
+                const chunkSize = 5;
+                const delay = ms => new Promise(res => setTimeout(res, ms));
+                
+                for (let i = 0; i < combinations.length; i += chunkSize) {
+                    const chunk = combinations.slice(i, i + chunkSize);
+                    await Promise.all(chunk.map(async (combo) => {
+                        if (combo.team.lastPoint) {
+                            let roadData = await getRoadRoute(combo.team.lastPoint, combo.trip);
+                            combo.duration = roadData.duration;
+                        } else {
+                            combo.duration = (1000 - combo.trip.lat) * 3600; // 초기 위치가 없을 때 위도 기준 방어
+                        }
+                    }));
+                    if (i + chunkSize < combinations.length) await delay(300);
+                }
 
                 let bestCombo = combinations.reduce((min, curr) => curr.duration < min.duration ? curr : min, {duration: Infinity});
 

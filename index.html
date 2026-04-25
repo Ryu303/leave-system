@@ -317,7 +317,10 @@
 
                 <!-- 우측: 내 휴가 내역 -->
                 <div style="flex: 1; min-width: 300px; background-color: var(--col-bg); padding: 1.5rem; border-radius: 12px;">
-                    <h3 style="font-size: 1rem; margin-top: 0; margin-bottom: 1rem;">내 휴가 내역</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1rem;">
+                        <h3 style="font-size: 1rem; margin: 0;">내 휴가 내역</h3>
+                        <span style="font-size: 0.75rem; color: var(--danger); font-weight: 600;">※ 휴가 취소는 담당자 보고 후 진행해주세요.</span>
+                    </div>
                     <ul id="leave-history-list" class="user-list" style="max-height: 280px; overflow-y: auto;">
                         <li style="justify-content: center; color: var(--text-muted); font-size: 0.9rem;">휴가 내역이 없습니다.</li>
                     </ul>
