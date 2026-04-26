@@ -265,6 +265,10 @@ db.ref('leaves').orderByKey().limitToLast(300).on('value', (s) => {
         Object.values(data).forEach(l => { if (l.status === 'pending' && !isFirstLeavesLoad && !previousPendingLeaves.has(l.id)) showToast(`🚨 휴가 신청: ${l.userName}`, 'warning'); previousPendingLeaves.add(l.id); });
     }
     isFirstLeavesLoad = false;
+
+    // 데이터 변경 시 화면 즉시 새로고침
+    if (typeof renderLeaveUI === 'function') renderLeaveUI();
+    if (typeof renderAdminLeaves === 'function') renderAdminLeaves();
 });
 
 function changeMyPageMonth(offset) { currentDateForMyPageCalendar.setMonth(currentDateForMyPageCalendar.getMonth() + offset); renderMyPage(); }
@@ -562,4 +566,6 @@ db.ref('notices').orderByKey().limitToLast(50).on('value', (s) => {
     const data = s.val() || {};
     for(let key in data) data[key].id = key; 
     AppStore.setNotices(data);
+
+    if (typeof renderNotices === 'function') renderNotices();
 });

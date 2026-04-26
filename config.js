@@ -19,8 +19,10 @@ const AppStore = {
     getTasks: function() { return this.state.tasks; },
     setTasks: function(newData) {
         this.state.tasks = newData;
-        if(typeof renderTasks === 'function') renderTasks();
-        if(typeof renderMyPage === 'function') renderMyPage();
+        setTimeout(() => {
+            try { if(typeof renderTasks === 'function') renderTasks(); } catch(e){}
+            try { if(typeof renderMyPage === 'function') renderMyPage(); } catch(e){}
+        }, 0);
     },
     mergeTasks: function(newData, status) {
         Object.keys(this.state.tasks).forEach(key => {
@@ -29,24 +31,30 @@ const AppStore = {
             }
         });
         Object.assign(this.state.tasks, newData);
-        if(typeof renderTasks === 'function') renderTasks();
-        if(typeof renderMyPage === 'function') renderMyPage();
+        setTimeout(() => {
+            try { if(typeof renderTasks === 'function') renderTasks(); } catch(e){}
+            try { if(typeof renderMyPage === 'function') renderMyPage(); } catch(e){}
+        }, 0);
     },
     getTrips: function() { return this.state.trips; },
     setTrips: function(newData) {
         this.state.trips = newData;
-        if(typeof renderTasks === 'function') renderTasks();
-        if(typeof renderMyPage === 'function') renderMyPage();
-        if(typeof renderTripList === 'function') renderTripList();
+        setTimeout(() => {
+            try { if(typeof renderTasks === 'function') renderTasks(); } catch(e){}
+            try { if(typeof renderMyPage === 'function') renderMyPage(); } catch(e){}
+            try { if(typeof renderTripList === 'function') renderTripList(); } catch(e){}
+        }, 0);
     },
     getLeaves: function() { return this.state.leaves; },
     setLeaves: function(newData) {
         this.state.leaves = newData;
-        if(typeof renderTasks === 'function') renderTasks();
-        if(typeof renderLeaveUI === 'function') renderLeaveUI();
-        if(typeof renderMyPage === 'function') renderMyPage();
-        const user = firebase.auth().currentUser;
-        if(user && user.uid === ADMIN_UID && typeof renderAdminLeaves === 'function') renderAdminLeaves();
+        setTimeout(() => {
+            try { if(typeof renderTasks === 'function') renderTasks(); } catch(e){}
+            try { if(typeof renderLeaveUI === 'function') renderLeaveUI(); } catch(e){}
+            try { if(typeof renderMyPage === 'function') renderMyPage(); } catch(e){}
+            const user = firebase.auth().currentUser;
+            try { if(user && user.uid === ADMIN_UID && typeof renderAdminLeaves === 'function') renderAdminLeaves(); } catch(e){}
+        }, 0);
     },
     getUsers: function() { return this.state.users; },
     setUsers: function(newData) {

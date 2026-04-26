@@ -189,3 +189,18 @@ async function saveProfile() {
         await customAlert('수정 실패: ' + error.message);
     }
 }
+
+// 브라우저 탭 활성화 시 (다른 창에 있다가 돌아왔을 때) 화면 즉시 강제 새로고침
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        setTimeout(() => {
+            try { if (typeof renderTripList === 'function') renderTripList(); } catch(e){}
+            try { if (typeof renderTasks === 'function') renderTasks(); } catch(e){}
+            try { if (typeof renderMyPage === 'function') renderMyPage(); } catch(e){}
+            try { if (typeof renderLeaveUI === 'function') renderLeaveUI(); } catch(e){}
+            try { if (typeof renderNotices === 'function') renderNotices(); } catch(e){}
+            const user = firebase.auth().currentUser;
+            try { if(user && user.uid === ADMIN_UID && typeof renderAdminLeaves === 'function') renderAdminLeaves(); } catch(e){}
+        }, 100);
+    }
+});

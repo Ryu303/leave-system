@@ -124,6 +124,10 @@ async function saveTrip() {
         };
         if (currentTripId) await db.ref('businessTrips/' + currentTripId).update(tripData);
         else { tripData.timestamp = Date.now(); const ref = db.ref('businessTrips').push(); tripData.id = ref.key; await ref.set(tripData); }
+        
+        // 서버 통신 완료 직후 화면을 즉시 강제 렌더링 (체감 속도 0.1초)
+        if (typeof renderTripList === 'function') renderTripList();
+        
         closeTripModal();
     } catch (e) { 
         await customAlert("저장 실패: " + e.message); 
@@ -141,9 +145,39 @@ async function deleteTrip(id) {
         if (trip && trip.schedulePath) storage.ref(trip.schedulePath).delete().catch(()=>{});
         
         await db.ref('businessTrips/' + id).remove();
+        
+        // 서버 삭제 직후 즉시 렌더링
+        if (typeof renderTripList === 'function') renderTripList();
         showToast('출장이 성공적으로 삭제되었습니다.', 'info');
     } catch (error) {
         await customAlert('❌ 삭제 실패: ' + error.message + '\n\n(파이어베이스 권한 또는 네트워크 문제일 수 있습니다)');
+    }
+}
+
+async function deleteSelectedTrips() {
+    const checkedBoxes = document.querySelectorAll('.trip-checkbox:checked');
+    if (checkedBoxes.length === 0) {
+        return await customAlert('삭제할 출장을 체크(✔)해 주세요.');
+    }
+
+    if (!(await checkAuth('승인된 사용자만 삭제할 수 있습니다.'))) return;
+    if (!await customConfirm(`선택한 ${checkedBoxes.length}개의 출장을 일괄 삭제하시겠습니까?\n(이 작업은 되돌릴 수 없습니다.)`)) return;
+
+    try {
+        const promises = [];
+        checkedBoxes.forEach(cb => {
+            const id = cb.value;
+            const trip = AppStore.getTrips()[id];
+            if (trip && trip.schedulePath) storage.ref(trip.schedulePath).delete().catch(()=>{});
+            promises.push(db.ref('businessTrips/' + id).remove());
+        });
+
+        await Promise.all(promises);
+        
+        if (typeof renderTripList === 'function') renderTripList();
+        showToast(`${checkedBoxes.length}개의 출장이 성공적으로 삭제되었습니다.`, 'info');
+    } catch (error) {
+        await customAlert('❌ 일괄 삭제 실패: ' + error.message);
     }
 }
 
@@ -156,6 +190,13 @@ db.ref('businessTrips').orderByKey().limitToLast(300).on('value', (s) => {
     const data = s.val() || {}; 
     for(let key in data) data[key].id = key; // 진짜 DB 키로 강제 동기화
     AppStore.setTrips(data);
+
+    // 데이터 변경 수신 시 0.05초 딜레이를 주어 DOM 충돌 방지 및 안전한 렌더링
+    setTimeout(() => {
+        try { if (typeof renderTripList === 'function') renderTripList(); } catch(e){}
+        try { if (typeof renderTasks === 'function') renderTasks(); } catch(e){}
+        try { if (typeof renderMyPage === 'function') renderMyPage(); } catch(e){}
+    }, 50);
 });
 
 function renderTripList() {

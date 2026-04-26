@@ -231,6 +231,7 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 0.75rem; border-bottom: 2px solid var(--bg-color); flex-wrap: wrap; gap: 1rem;">
                 <h2 style="margin: 0; padding: 0; border: none;"><span class="material-symbols-rounded" style="vertical-align:bottom; margin-right:6px;">flight_takeoff</span>출장 업무 관리</h2>
                 <div style="display: flex; gap: 0.5rem;">
+                    <button onclick="deleteSelectedTrips()" style="background-color: var(--danger); display:flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:1.2em;">delete</span> 선택 삭제</button>
                     <button onclick="openCommonCalendarModal()" style="background-color: var(--col-bg); color: var(--text-main); border: 1px solid var(--border-color); box-shadow: none; display:flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:1.2em;">calendar_month</span> 전체 캘린더 보기</button>
                     <button id="addTripBtn" onclick="openTripModal()" style="display:flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:1.2em;">add</span> 새 출장 추가</button>
                 </div>
