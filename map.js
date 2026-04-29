@@ -30,6 +30,14 @@ function openTripModal(id = null, name = '', date = '', assignee = '', contact =
     document.getElementById('tripRequiredPersonnel').value = trip && trip.requiredPersonnel ? trip.requiredPersonnel : 1;
     document.getElementById('tripAuthorDisplay').textContent = trip && trip.author ? `등록: ${trip.author}` : '';
     
+    // 관리자이거나 본인이 작성한 출장이면 모달 내 삭제 버튼 표시
+    const delBtn = document.getElementById('tripModalDeleteBtn');
+    if (delBtn) {
+        const isAdmin = auth.currentUser && auth.currentUser.uid === ADMIN_UID;
+        const isAuthor = trip && trip.author === (AppStore.getCurrentUser() ? AppStore.getCurrentUser().displayName : '');
+        delBtn.style.display = (isAdmin || isAuthor) ? 'inline-block' : 'none';
+    }
+
     document.getElementById('tripModal').style.display = 'flex';
 }
 
@@ -181,6 +189,12 @@ async function deleteSelectedTrips() {
     }
 }
 
+async function deleteCurrentTrip() {
+    if (!currentTripId) return;
+    await deleteTrip(currentTripId);
+    closeTripModal();
+}
+
 document.getElementById('tripModal').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'BUTTON') { e.preventDefault(); saveTrip(); }
 });
@@ -210,9 +224,22 @@ function renderTripList() {
         if (reqGender === 'female') badges += `<span style="font-size:0.7rem; background-color:#FCE7F3; color:#EC4899; padding:2px 6px; border-radius:4px; margin-left:4px; font-weight:bold; vertical-align:middle;">👩‍💼 여성 필수</span>`;
         else if (reqGender === 'male') badges += `<span style="font-size:0.7rem; background-color:#E0F2FE; color:#3B82F6; padding:2px 6px; border-radius:4px; margin-left:4px; font-weight:bold; vertical-align:middle;">👨‍💼 남성 필수</span>`;
 
+        // VIP 카테고리 배지 추가 (텔러스헬스, 휴노 커스텀 적용)
+        let categoryBadge = '';
+        const checkStr = trip.category ? trip.category : trip.name;
+        if (checkStr) {
+            if (checkStr.includes('텔러스헬스')) {
+                categoryBadge = `<span style="font-size:0.7rem; background-color:#EFF6FF; color:#2563EB; padding:2px 6px; border-radius:4px; margin-left:4px; font-weight:bold; vertical-align:middle; border:1px solid #BFDBFE;">🏥 텔러스헬스</span>`;
+            } else if (checkStr.includes('휴노')) {
+                categoryBadge = `<span style="font-size:0.7rem; background-color:#F0FDF4; color:#16A34A; padding:2px 6px; border-radius:4px; margin-left:4px; font-weight:bold; vertical-align:middle; border:1px solid #BBF7D0;">🌿 휴노</span>`;
+            } else if (trip.category.toUpperCase().startsWith('VIP')) {
+                categoryBadge = `<span style="font-size:0.7rem; background-color:#FFFBEB; color:#F59E0B; padding:2px 6px; border-radius:4px; margin-left:4px; font-weight:bold; vertical-align:middle; border:1px solid #FEF3C7;">⭐ VIP</span>`;
+            }
+        }
+
         div.title = trip.author ? `등록자: ${trip.author}` : '';
         if (trip.date && new Date(trip.date).setHours(0,0,0,0) < new Date().setHours(0,0,0,0)) div.classList.add('past-trip');
-        div.innerHTML = `<div class="trip-header"><div style="display:flex; align-items:flex-start; gap:10px;"><input type="checkbox" class="trip-checkbox" value="${trip.id}" style="width:18px; height:18px; margin-top:2px; cursor:pointer;" title="동선 최적화 선택"><div style="flex:1;"><div class="trip-title">${trip.name}${badges}</div><div class="trip-date">${trip.date}</div></div></div><div style="display:flex;gap:0.3rem;"><button class="delete-btn edit" style="padding:0.3rem;background:var(--col-bg);color:var(--text-main)"><span class="material-symbols-rounded">edit</span></button><button class="delete-btn del" style="padding:0.3rem"><span class="material-symbols-rounded">close</span></button></div></div><div class="trip-info-row">${trip.address}${trip.bookedHotel ? `<div style="color:#E63946; font-size:0.8rem; font-weight:bold; margin-top:4px;"><span class="material-symbols-rounded" style="font-size:1.1em; vertical-align:middle;">hotel</span> 예약 숙소: ${trip.bookedHotel}</div>` : ''}</div>`;
+        div.innerHTML = `<div class="trip-header"><div style="display:flex; align-items:flex-start; gap:10px;"><input type="checkbox" class="trip-checkbox" value="${trip.id}" style="width:18px; height:18px; margin-top:2px; cursor:pointer;" title="동선 최적화 선택"><div style="flex:1;"><div class="trip-title">${trip.name}${badges}${categoryBadge}</div><div class="trip-date">${trip.date}</div></div></div><div style="display:flex;gap:0.3rem;"><button class="delete-btn edit" style="padding:0.3rem;background:var(--col-bg);color:var(--text-main)"><span class="material-symbols-rounded">edit</span></button><button class="delete-btn del" style="padding:0.3rem"><span class="material-symbols-rounded">close</span></button></div></div><div class="trip-info-row">${trip.address}${trip.bookedHotel ? `<div style="color:#E63946; font-size:0.8rem; font-weight:bold; margin-top:4px;"><span class="material-symbols-rounded" style="font-size:1.1em; vertical-align:middle;">hotel</span> 예약 숙소: ${trip.bookedHotel}</div>` : ''}</div>`;
         
         div.onclick = (e) => {
             if (e.target.closest('.edit') || e.target.closest('.del')) return;
@@ -264,26 +291,24 @@ function getHaversineDistance(lat1, lon1, lat2, lon2) {
 
 // 카카오 내비 API를 활용한 실제 도로 경로 및 거리 탐색 함수
 async function getRoadRoute(point1, point2) {
-    const KAKAO_REST_API_KEY = "9159f23f57165f61ac722d066d6f43b5";
-    const url = `https://apis-navi.kakaomobility.com/v1/directions?origin=${point1.lng},${point1.lat}&destination=${point2.lng},${point2.lat}`;
+    // 백엔드에 구현된 보안 Callable Function 호출
+    const getKakaoRouteCallable = functions.https.callable('getKakaoRoute');
     try {
-        const res = await fetch(url, { headers: { 'Authorization': `KakaoAK ${KAKAO_REST_API_KEY}` } });
-        if (res.ok) {
-            const data = await res.json();
-            if (data.routes && data.routes.length > 0) {
-                const route = data.routes[0];
-                const distance = route.summary.distance / 1000; // 미터를 km로 변환
-                const duration = route.summary.duration; // 초 단위 운전 소요 시간
-                const path = [];
-                route.sections.forEach(section => {
-                    section.roads.forEach(road => {
-                        for (let i = 0; i < road.vertexes.length; i += 2) {
-                            path.push(new kakao.maps.LatLng(road.vertexes[i+1], road.vertexes[i]));
-                        }
-                    });
+        const result = await getKakaoRouteCallable({ origin: point1, destination: point2 });
+        const data = result.data;
+        if (data && data.routes && data.routes.length > 0) {
+            const route = data.routes[0];
+            const distance = route.summary.distance / 1000; // 미터를 km로 변환
+            const duration = route.summary.duration; // 초 단위 운전 소요 시간
+            const path = [];
+            route.sections.forEach(section => {
+                section.roads.forEach(road => {
+                    for (let i = 0; i < road.vertexes.length; i += 2) {
+                        path.push(new kakao.maps.LatLng(road.vertexes[i+1], road.vertexes[i]));
+                    }
                 });
-                return { distance, duration, path };
-            }
+            });
+            return { distance, duration, path };
         }
     } catch (e) {
         console.error("🔥 카카오 내비 API 통신 실패:", e);

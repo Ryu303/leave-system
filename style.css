@@ -518,7 +518,7 @@ select option {
 .calendar-day-header.sat { color: var(--primary); }
 
 .calendar-day {
-    background-color: var(--card-bg); min-height: 120px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.3rem; transition: background-color 0.2s;
+    background-color: var(--card-bg); height: 120px; padding: 0.5rem; display: flex; flex-direction: column; gap: 0.3rem; transition: background-color 0.2s; overflow-y: auto;
 }
 .calendar-day:hover { background-color: var(--col-bg); }
 .calendar-day.other-month { background-color: var(--col-bg); opacity: 0.5; }
@@ -531,14 +531,24 @@ select option {
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: white;
     display: flex; align-items: center; gap: 4px;
     box-shadow: var(--shadow-sm); transition: transform 0.1s;
+    flex-shrink: 0; /* 내용이 많아져도 위아래로 찌그러지지 않도록 고정 */
+    position: relative; /* z-index를 적용하기 위한 포지셔닝 컨텍스트 생성 */
 }
 .calendar-task:hover { filter: brightness(0.9); transform: translateY(-1px); }
+.calendar-task:hover { filter: brightness(0.9); transform: translateY(-1px); z-index: 10; /* 다른 일정 위에 표시되도록 z-index 추가 */ }
+
+.clickable-date { cursor: pointer; display: inline-block; transition: color 0.2s; }
+.clickable-date:hover { color: var(--primary) !important; text-decoration: underline; }
 
 /* 마이페이지 미니 캘린더용 */
 .mypage-calendar-day {
-    background-color: var(--card-bg); min-height: 60px; padding: 0.3rem; display: flex; flex-direction: column; gap: 0.2rem;
+    background-color: var(--card-bg); height: 80px; padding: 0.3rem; display: flex; flex-direction: column; gap: 0.2rem; overflow-y: auto;
 }
 .mypage-calendar-day:hover { background-color: var(--col-bg); }
+
+/* 캘린더 내부 스크롤바 미니멀 스타일링 */
+.calendar-day::-webkit-scrollbar, .mypage-calendar-day::-webkit-scrollbar { width: 4px; }
+.calendar-day::-webkit-scrollbar-thumb, .mypage-calendar-day::-webkit-scrollbar-thumb { background-color: var(--border-color); border-radius: 4px; }
 
 /* ==================== 
    실시간 문서 & 파일 드라이브 

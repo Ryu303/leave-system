@@ -160,6 +160,14 @@ function openModal(taskId, title, description, dueDate, startDate) {
     const task = AppStore.getTasks()[taskId];
     document.getElementById('taskAuthorDisplay').textContent = task && task.author ? `등록: ${task.author}` : '';
 
+    // 관리자이거나 본인이 작성한 업무면 모달 내 삭제 버튼 표시
+    const delBtn = document.getElementById('modalDeleteBtn');
+    if (delBtn) {
+        const isAdmin = auth.currentUser && auth.currentUser.uid === ADMIN_UID;
+        const isAuthor = task && task.author === (AppStore.getCurrentUser() ? AppStore.getCurrentUser().displayName : '');
+        delBtn.style.display = (isAdmin || isAuthor) ? 'inline-block' : 'none';
+    }
+
     document.getElementById('taskModal').style.display = 'flex';
 }
 
@@ -181,6 +189,11 @@ async function saveDescription() {
 document.getElementById('taskModal').addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'BUTTON') { e.preventDefault(); saveDescription(); }
 });
+
+async function deleteCurrentTask() {
+    if (!currentModalTaskId) return;
+    if (await customConfirm('이 업무를 완전히 삭제하시겠습니까?')) { db.ref('tasks/' + currentModalTaskId).remove(); closeModal(); }
+}
 
 function openCommonCalendarModal() { document.getElementById('commonCalendarModal').style.display = 'flex'; renderModalCalendar(); }
 function closeCommonCalendarModal() { document.getElementById('commonCalendarModal').style.display = 'none'; }
@@ -221,12 +234,14 @@ function renderModalCalendar() {
         let reqPers = t.requiredPersonnel || 1;
         return { ...t, isTrip: true, title: `⚑ [출장] ${t.name} [${reqPers}명]${badge}`, startDate: t.date, dueDate: t.date, status: 'todo' };
     });
-    const leavesArray = Object.values(AppStore.getLeaves()).filter(l => l.status === 'approved').map(l => ({ id: l.id, isLeave: true, title: `[휴가] ${l.userName}`, name: `[휴가] ${l.userName}`, assignee: l.userName, startDate: l.date, dueDate: l.date, status: 'todo', priority: 'medium' }));
+    const leavesArray = Object.values(AppStore.getLeaves()).filter(l => l.status === 'approved').map(l => ({ id: l.id, uid: l.uid, isLeave: true, title: `[휴가] ${l.userName}`, name: `[휴가] ${l.userName}`, assignee: l.userName, startDate: l.date, dueDate: l.date, status: 'todo', priority: 'medium' }));
     const combinedArray = [...tasksArray, ...tripsArray, ...leavesArray];
 
     buildCalendarGrid('modal-calendar-grid', 'modal-calendar-month-year', currentDateForModalCalendar, false, (cell, dateString) => {
+        const dayItems = [];
         combinedArray.forEach(task => {
             if (task.dueDate === dateString) {
+                dayItems.push(task);
                 const el = document.createElement('div'); el.className = 'calendar-task'; el.title = task.title;
                 let statusIcon = task.isLeave ? '🌴 ' : (!task.isTrip && task.status === 'done' ? '✓ ' : '');
                 el.textContent = statusIcon + task.title;
@@ -234,14 +249,23 @@ function renderModalCalendar() {
                 if (task.status === 'done' && !task.isTrip) el.classList.add('task-done-style');
                 
                 el.onclick = () => {
-                    closeCommonCalendarModal();
-                    if (task.isLeave) customAlert(`🌴 휴가: ${task.assignee}`);
-                    else if (task.isTrip) openTripModal(task.id, task.name, task.date, task.assignee, task.contact, task.address, task.scheduleUrl, task.schedulePath, task.qrUrl, task.qrPath);
-                    else openModal(task.id, task.title, task.description, task.dueDate, task.startDate);
+                    if (task.isLeave) openLeaveDetailModal(task.id);
+                    else if (task.isTrip) { closeCommonCalendarModal(); openTripModal(task.id, task.name, task.date, task.assignee, task.contact, task.address, task.scheduleUrl, task.schedulePath, task.qrUrl, task.qrPath); }
+                    else { closeCommonCalendarModal(); openModal(task.id, task.title, task.description, task.dueDate, task.startDate); }
                 };
                 cell.appendChild(el);
             }
         });
+        const dateHeader = cell.querySelector('.calendar-date');
+        if (dateHeader) {
+            dateHeader.classList.add('clickable-date');
+            dateHeader.title = '클릭하여 전체 일정 보기';
+            dateHeader.onclick = (e) => {
+                e.stopPropagation();
+                if (dayItems.length > 0) openTripGroupModal(`🗓 ${dateString} 전체 일정`, dayItems);
+                else showToast('이 날짜에는 등록된 일정이 없습니다.', 'info');
+            };
+        }
     });
 }
 
@@ -255,8 +279,10 @@ function changeGanttMonth(offset) { currentDateForGantt.setMonth(currentDateForG
 
 function renderCalendar(tasksArray) {
     buildCalendarGrid('calendar-grid', 'calendar-month-year', currentDateForCalendar, false, (cell, dateString) => {
+        const dayItems = [];
         tasksArray.forEach(task => {
             if (task.dueDate === dateString) {
+                dayItems.push(task);
                 const el = document.createElement('div'); el.className = 'calendar-task'; el.title = task.title; el.dataset.assignee = task.assignee || '미지정';
                 el.innerHTML = task.isLeave ? '<span class="material-symbols-rounded" style="font-size:1.1em; margin-right:4px;">beach_access</span>' : (task.isTrip ? '<span class="material-symbols-rounded" style="font-size:1.1em; margin-right:4px;">flight_takeoff</span>' : (task.status === 'done' ? '<span class="material-symbols-rounded" style="font-size:1.1em; margin-right:4px;">check_circle</span>' : ''));
                 el.appendChild(document.createTextNode(task.title));
@@ -264,13 +290,23 @@ function renderCalendar(tasksArray) {
                 if (task.status === 'done' && !task.isTrip) el.classList.add('task-done-style');
                 
                 el.onclick = () => {
-                    if (task.isLeave) customAlert(`🌴 휴가: ${task.assignee}`);
+                    if (task.isLeave) openLeaveDetailModal(task.id);
                     else if (task.isTrip) openTripModal(task.id, task.name, task.date, task.assignee, task.contact, task.address, task.scheduleUrl, task.schedulePath, task.qrUrl, task.qrPath);
                     else openModal(task.id, task.title, task.description, task.dueDate, task.startDate);
                 };
                 cell.appendChild(el);
             }
         });
+        const dateHeader = cell.querySelector('.calendar-date');
+        if (dateHeader) {
+            dateHeader.classList.add('clickable-date');
+            dateHeader.title = '클릭하여 전체 일정 보기';
+            dateHeader.onclick = (e) => {
+                e.stopPropagation();
+                if (dayItems.length > 0) openTripGroupModal(`🗓 ${dateString} 전체 일정`, dayItems);
+                else showToast('이 날짜에는 등록된 일정이 없습니다.', 'info');
+            };
+        }
     });
 }
 
@@ -287,10 +323,9 @@ function openTripGroupModal(titleText, items) {
         
         li.innerHTML = `<div style="display: flex; flex-direction: column; gap: 0.3rem;"><span style="color: ${color}; font-size: 0.95rem; font-weight: 600; display:flex; align-items:center;"><span class="material-symbols-rounded" style="font-size:1.2em; margin-right:4px;">${icon}</span> ${titleToDisplay}</span><span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal;">${subtitle}</span></div>`;
         li.onclick = () => {
-            closeTripGroupModal();
-            if (item.isLeave) customAlert(`🌴 휴가: ${item.assignee}`);
-            else if (item.isTrip) openTripModal(item.id, item.name, item.date, item.assignee, item.contact, item.address, item.scheduleUrl, item.schedulePath, item.qrUrl, item.qrPath);
-            else openModal(item.id, item.title, item.description, item.dueDate, item.startDate);
+            if (item.isLeave) openLeaveDetailModal(item.id);
+            else if (item.isTrip) { closeTripGroupModal(); openTripModal(item.id, item.name, item.date, item.assignee, item.contact, item.address, item.scheduleUrl, item.schedulePath, item.qrUrl, item.qrPath); }
+            else { closeTripGroupModal(); openModal(item.id, item.title, item.description, item.dueDate, item.startDate); }
         };
         listEl.appendChild(li);
     });
@@ -383,10 +418,18 @@ function renderTasks() {
         let htmlBadges = `<span style="font-size:0.65rem; background-color:var(--col-bg); color:var(--text-muted); padding:2px 4px; border-radius:4px; margin-left:6px; font-weight:bold; vertical-align:middle; border:1px solid var(--border-color);">${reqPers}명</span>`;
         if (reqGender === 'female') htmlBadges += `<span style="font-size:0.65rem; background-color:#FCE7F3; color:#EC4899; padding:2px 4px; border-radius:4px; margin-left:4px; font-weight:bold; vertical-align:middle;">👩‍💼 여성</span>`;
         else if (reqGender === 'male') htmlBadges += `<span style="font-size:0.65rem; background-color:#E0F2FE; color:#3B82F6; padding:2px 4px; border-radius:4px; margin-left:4px; font-weight:bold; vertical-align:middle;">👨‍💼 남성</span>`;
+        
+        // 카테고리 배지 (칸반 보드용)
+        const checkStr = t.category ? t.category : t.name;
+        if (checkStr) {
+            if (checkStr.includes('텔러스헬스')) htmlBadges += `<span style="font-size:0.65rem; background-color:#EFF6FF; color:#2563EB; padding:2px 4px; border-radius:4px; margin-left:4px; font-weight:bold; vertical-align:middle; border:1px solid #BFDBFE;">🏥 텔러스헬스</span>`;
+            else if (checkStr.includes('휴노')) htmlBadges += `<span style="font-size:0.65rem; background-color:#F0FDF4; color:#16A34A; padding:2px 4px; border-radius:4px; margin-left:4px; font-weight:bold; vertical-align:middle; border:1px solid #BBF7D0;">🌿 휴노</span>`;
+            else if (t.category && t.category.toUpperCase().startsWith('VIP')) htmlBadges += `<span style="font-size:0.65rem; background-color:#FFFBEB; color:#F59E0B; padding:2px 4px; border-radius:4px; margin-left:4px; font-weight:bold; vertical-align:middle; border:1px solid #FEF3C7;">⭐ VIP</span>`;
+        }
 
         return { ...t, isTrip: true, title: `⚑ [출장] ${t.name}`, badgesHtml: htmlBadges, startDate: t.date, dueDate: t.date, status: 'todo' };
     });
-    const leavesArray = Object.values(AppStore.getLeaves()).filter(l => l.status === 'approved').map(l => ({ id: l.id, isLeave: true, title: `[휴가] ${l.userName}`, assignee: l.userName, startDate: l.date, dueDate: l.date, status: 'todo', priority: 'medium' }));
+    const leavesArray = Object.values(AppStore.getLeaves()).filter(l => l.status === 'approved').map(l => ({ id: l.id, uid: l.uid, isLeave: true, title: `[휴가] ${l.userName}`, assignee: l.userName, startDate: l.date, dueDate: l.date, status: 'todo', priority: 'medium' }));
     const combinedArray = [...tasksArray, ...tripsArray, ...leavesArray];
 
     if (AppStore.getViewMode() === 'calendar') { renderCalendar(combinedArray); filterTasks(); return; }

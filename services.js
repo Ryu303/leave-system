@@ -112,6 +112,54 @@ async function cancelLeave(id) {
 }
 async function deleteLeaveRecord(id) { if (await customConfirm('삭제하시겠습니까?')) db.ref('leaves/' + id).remove(); }
 
+// 휴가 상세 정보 모달
+let currentLeaveDetailId = null;
+function openLeaveDetailModal(leaveId) {
+    const leave = AppStore.getLeaves()[leaveId];
+    if (!leave) return;
+
+    currentLeaveDetailId = leaveId;
+
+    const modal = document.getElementById('leaveDetailModal');
+    const body = document.getElementById('leaveDetailBody');
+    const cancelButton = document.getElementById('leaveDetailCancelBtn');
+
+    let statusText = leave.status === 'approved' ? '승인됨' : (leave.status === 'pending' ? '승인 대기중' : (leave.status === 'cancel_requested' ? '취소 대기중' : (leave.status === 'rejected' ? '반려됨' : '취소됨')));
+    let color = leave.status === 'approved' ? '#10B981' : (leave.status === 'rejected' || leave.status === 'cancel_requested' ? 'var(--danger)' : '#F59E0B');
+
+    body.innerHTML = `
+        <div>
+            <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">신청자</label>
+            <p style="margin: 0.3rem 0 0 0; font-weight: 600;">${leave.userName}</p>
+        </div>
+        <div>
+            <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">휴가일</label>
+            <p style="margin: 0.3rem 0 0 0; font-weight: 600;">${leave.date}</p>
+        </div>
+        <div>
+            <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">상태</label>
+            <p style="margin: 0.3rem 0 0 0; font-weight: 600; color: ${color};">${statusText}</p>
+        </div>
+    `;
+
+    const isAdmin = auth.currentUser && auth.currentUser.uid === ADMIN_UID;
+    const isAuthor = auth.currentUser && auth.currentUser.uid === leave.uid;
+
+    if (isAdmin || (isAuthor && (leave.status === 'pending' || leave.status === 'approved'))) {
+        cancelButton.style.display = 'block';
+        cancelButton.onclick = () => {
+            if (isAdmin && !isAuthor) customConfirm(`관리자 권한으로 이 휴가를 완전히 삭제하시겠습니까?`).then(res => { if(res) { db.ref('leaves/' + leaveId).remove(); closeLeaveDetailModal(); } });
+            else { cancelLeave(leaveId); closeLeaveDetailModal(); }
+        };
+    } else cancelButton.style.display = 'none';
+    modal.style.display = 'flex';
+}
+
+function closeLeaveDetailModal() {
+    document.getElementById('leaveDetailModal').style.display = 'none';
+    currentLeaveDetailId = null;
+}
+
 function renderAdminLeaves() {
     const listEl = document.getElementById('admin-leave-list');
     if (listEl) {
@@ -320,7 +368,16 @@ function renderMyPage() {
         let reqPers = t.requiredPersonnel || 1;
         const femaleBadge = reqGender === 'female' ? ' 👩‍💼' : (reqGender === 'male' ? ' 👨‍💼' : '');
         const persBadge = `<span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal; margin-left:4px;">[${reqPers}명]</span>`;
-        const li = document.createElement('li'); li.innerHTML = `<div style="font-weight:600;">${t.name}${persBadge}${femaleBadge}</div><div style="font-size:0.8rem;">날짜: ${t.date || '미정'}</div>`; li.onclick = () => openTripModal(t.id, t.name, t.date, t.assignee); tripsList.appendChild(li);
+        
+        let categoryBadge = '';
+        const checkStr = t.category ? t.category : t.name;
+        if (checkStr) {
+            if (checkStr.includes('텔러스헬스')) categoryBadge = `<span style="font-size:0.7rem; background-color:#EFF6FF; color:#2563EB; padding:2px 4px; border-radius:4px; margin-left:4px; font-weight:bold; vertical-align:middle; border:1px solid #BFDBFE;">🏥 텔러스헬스</span>`;
+            else if (checkStr.includes('휴노')) categoryBadge = `<span style="font-size:0.7rem; background-color:#F0FDF4; color:#16A34A; padding:2px 4px; border-radius:4px; margin-left:4px; font-weight:bold; vertical-align:middle; border:1px solid #BBF7D0;">🌿 휴노</span>`;
+            else if (t.category && t.category.toUpperCase().startsWith('VIP')) categoryBadge = `<span style="font-size:0.7rem; background-color:#FFFBEB; color:#F59E0B; padding:2px 4px; border-radius:4px; margin-left:4px; font-weight:bold; vertical-align:middle; border:1px solid #FEF3C7;">⭐ VIP</span>`;
+        }
+        
+        const li = document.createElement('li'); li.innerHTML = `<div style="font-weight:600;">${t.name}${persBadge}${femaleBadge}${categoryBadge}</div><div style="font-size:0.8rem;">날짜: ${t.date || '미정'}</div>`; li.onclick = () => openTripModal(t.id, t.name, t.date, t.assignee); tripsList.appendChild(li);
     });
     
     // 마이페이지의 내 휴가 결재 섹션에는 '승인된(approved)' 휴가만 노출되도록 필터링
@@ -340,13 +397,32 @@ function renderMyPage() {
     if (calGrid) {
         buildCalendarGrid('mypage-calendar-grid', 'mypage-calendar-month-year', currentDateForMyPageCalendar, true, (cell, dateString, isCurrentMonth) => {
             if (isCurrentMonth) {
-                myLeaves.filter(l => l.date === dateString).forEach(l => {
+                const dayLeaves = myLeaves.filter(l => l.date === dateString);
+                dayLeaves.forEach(l => {
                     const el = document.createElement('div'); el.className = 'calendar-task'; el.style.padding = '2px'; el.style.fontSize = '0.7rem'; el.title = l.status;
                     let color = l.status === 'approved' ? '#10B981' : (l.status === 'rejected' ? 'var(--danger)' : '#F59E0B');
                     el.style.backgroundColor = color;
                     el.innerHTML = `<span class="material-symbols-rounded" style="font-size:1em; margin-right:2px;">${l.status === 'approved' ? 'check_circle' : 'pending'}</span>휴가`;
+                    el.onclick = (e) => {
+                        e.stopPropagation();
+                        openLeaveDetailModal(l.id);
+                    };
                     cell.appendChild(el);
                 });
+                
+                const dateHeader = cell.querySelector('.calendar-date');
+                if (dateHeader) {
+                    dateHeader.classList.add('clickable-date');
+                    dateHeader.title = '클릭하여 전체 일정 보기';
+                    dateHeader.onclick = (e) => {
+                        e.stopPropagation();
+                        if (dayLeaves.length > 0) {
+                            const mapItems = dayLeaves.map(l => ({ id: l.id, uid: l.uid, isLeave: true, title: `[휴가] ${l.userName}`, name: `[휴가] ${l.userName}`, assignee: l.userName, startDate: l.date, dueDate: l.date, status: l.status, priority: 'medium' }));
+                            openTripGroupModal(`🗓 ${dateString} 내 휴가`, mapItems);
+                        }
+                        else showToast('이 날짜에는 등록된 휴가가 없습니다.', 'info');
+                    };
+                }
             }
         });
     }
@@ -569,3 +645,45 @@ db.ref('notices').orderByKey().limitToLast(50).on('value', (s) => {
 
     if (typeof renderNotices === 'function') renderNotices();
 });
+
+// ----------------------------------------------------
+// Google 캘린더 연동
+// ----------------------------------------------------
+/**
+ * Google 캘린더 연동 및 동기화를 위한 함수
+ * 1. 사용자에게 Google 캘린더 접근 권한을 요청 (OAuth 2.0)
+ * 2. 권한 획득 시, Access Token을 사용하여 캘린더 목록을 가져오는 예제 포함
+ */
+async function linkGoogleCalendar() {
+    const user = auth.currentUser;
+    if (!user) {
+        return await customAlert('먼저 구글 계정으로 로그인해주세요.');
+    }
+
+    // 1. Google Calendar API 접근을 위한 'scope'를 provider에 추가합니다.
+    const calendarProvider = new firebase.auth.GoogleAuthProvider();
+    calendarProvider.addScope('https://www.googleapis.com/auth/calendar');
+
+    try {
+        // 2. 이미 구글로 로그인된 상태이므로 권한(Scope)을 추가하여 로그인 세션을 갱신합니다.
+        const result = await firebase.auth().signInWithPopup(calendarProvider);
+        const credential = result.credential;
+        const accessToken = credential.accessToken;
+
+        // 3. (예제) 연동된 계정의 캘린더 목록을 불러와 콘솔에 출력해보기
+        // 이 Access Token을 사용하여 Google Calendar API를 자유롭게 호출할 수 있습니다.
+        const response = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+        
+        if (!response.ok) throw new Error('캘린더 목록을 가져오는데 실패했습니다.');
+        
+        const calendarData = await response.json();
+        console.log('--- Google 캘린더 목록 (연동 성공) ---', calendarData.items);
+        await customAlert('✅ Google 캘린더가 성공적으로 연동되었습니다!\n\n개발자 콘솔(F12)에서 연동된 캘린더 목록을 확인해보세요.');
+
+    } catch (error) {
+        console.error('🔥 Google 캘린더 연동 오류:', error);
+        await customAlert(`캘린더 연동 중 오류가 발생했습니다.\n\n상세: ${error.message}`);
+    }
+}

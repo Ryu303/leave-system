@@ -1,6 +1,5 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
-const axios = require("axios"); // npm install axios 필요
 
 admin.initializeApp();
 
@@ -22,14 +21,15 @@ exports.getKakaoRoute = functions.region('asia-northeast3').https.onCall(async (
     const url = `https://apis-navi.kakaomobility.com/v1/directions?origin=${origin.lng},${origin.lat}&destination=${destination.lng},${destination.lat}`;
 
     try {
-        const response = await axios.get(url, {
+        const response = await fetch(url, {
             headers: { 'Authorization': `KakaoAK ${KAKAO_REST_API_KEY}` }
         });
         
-        // 성공적으로 받은 데이터를 프론트엔드로 그대로 전달
-        return response.data;
+        if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+        const resultData = await response.json();
+        return resultData;
     } catch (error) {
-        console.error("Kakao API Error:", error.response ? error.response.data : error.message);
+        console.error("Kakao API Error:", error);
         // 프론트엔드에는 구체적인 에러 원인을 숨기고 일반적인 메시지만 전달하여 추가적인 보안 확보
         throw new functions.https.HttpsError('internal', '경로를 가져오는 중 서버 오류가 발생했습니다.');
     }
@@ -54,6 +54,7 @@ exports.webhookAddTrip = functions.region('asia-northeast3').https.onRequest(asy
         // 3. Admin SDK를 사용하여 DB에 출장 강제 등록 (보안 규칙 우회)
         tripData.timestamp = Date.now();
         tripData.author = tripData.author || "Gmail 자동 등록";
+        tripData.category = tripData.category || "일반"; // Apps Script에서 보낸 카테고리 정보 추가
         
         const ref = admin.database().ref('businessTrips').push();
         tripData.id = ref.key;

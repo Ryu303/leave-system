@@ -135,7 +135,7 @@ function listenForUsers() {
             const safeName = user.displayName ? user.displayName.replace(/'/g, "\\'") : '이름없음';
             
             if (!user.approved) {
-                li.innerHTML = `<span>${user.displayName} <small style="color: var(--text-muted); font-weight: normal;">(${user.email})</small></span><button onclick="approveUser('${uid}', '${safeName}')">승인</button>`;
+                li.innerHTML = `<span>${user.displayName} <small style="color: var(--text-muted); font-weight: normal;">(${user.email})</small></span><div style="display:flex; gap:0.5rem;"><button onclick="approveUser('${uid}', '${safeName}')">승인</button><button class="revoke-btn" onclick="deleteUser('${uid}', '${safeName}')">삭제</button></div>`;
                 approvalListEl.appendChild(li); pendingCount++;
             } else {
                 const actionBtn = uid === ADMIN_UID ? `<span style="font-size: 0.8rem; color: var(--primary); font-weight: bold;">최고 관리자</span>` : `<button class="revoke-btn" onclick="revokeUser('${uid}', '${safeName}')">해제</button>`;
@@ -157,6 +157,12 @@ async function approveUser(uid, name) {
 async function revokeUser(uid, name) {
     if (await customConfirm(`'${name}' 사용자의 권한을 해제하시겠습니까?`)) {
         db.ref('users/' + uid).update({ approved: false }).catch(async (error) => await customAlert("해제 실패: " + error.message));
+    }
+}
+
+async function deleteUser(uid, name) {
+    if (await customConfirm(`'${name}' 사용자의 가입 요청을 거절하고 영구 삭제하시겠습니까?`)) {
+        db.ref('users/' + uid).remove().catch(async (error) => await customAlert("삭제 실패: " + error.message));
     }
 }
 

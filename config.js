@@ -114,6 +114,7 @@ const auth = firebase.auth();
 const provider = new firebase.auth.GoogleAuthProvider();
 const db = firebase.database();
 const storage = firebase.storage();
+const functions = firebase.app().functions('asia-northeast3');
 
 // ----------------------------------------------------
 // 다크 모드 & 테마 & 달력 설정
