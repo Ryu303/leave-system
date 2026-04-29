@@ -142,7 +142,7 @@ function openLeaveDetailModal(leaveId) {
         </div>
     `;
 
-    const isAdmin = auth.currentUser && auth.currentUser.uid === ADMIN_UID;
+    const isAdmin = auth.currentUser && ADMIN_UIDS.includes(auth.currentUser.uid);
     const isAuthor = auth.currentUser && auth.currentUser.uid === leave.uid;
 
     if (isAdmin || (isAuthor && (leave.status === 'pending' || leave.status === 'approved'))) {
@@ -309,7 +309,7 @@ db.ref('leaves').orderByKey().limitToLast(300).on('value', (s) => {
     const data = s.val() || {}; 
     for(let key in data) data[key].id = key; 
     AppStore.setLeaves(data);
-    if (auth.currentUser && auth.currentUser.uid === ADMIN_UID) {
+    if (auth.currentUser && ADMIN_UIDS.includes(auth.currentUser.uid)) {
         Object.values(data).forEach(l => { if (l.status === 'pending' && !isFirstLeavesLoad && !previousPendingLeaves.has(l.id)) showToast(`🚨 휴가 신청: ${l.userName}`, 'warning'); previousPendingLeaves.add(l.id); });
     }
     isFirstLeavesLoad = false;
@@ -548,21 +548,24 @@ db.ref('users').on('value', (snapshot) => {
 function renderMembersDirectory() {
     ['ceo', 'health_leader', 'health_member', 'marketing', 'bidding', 'unassigned'].forEach(id => { const el = document.getElementById('list-' + id); if (el) el.innerHTML = ''; });
     if (!auth.currentUser) return;
-    const isAdmin = auth.currentUser.uid === ADMIN_UID;
+    const isAdmin = ADMIN_UIDS.includes(auth.currentUser.uid);
     if (document.getElementById('org-admin-guide')) document.getElementById('org-admin-guide').style.display = isAdmin ? 'block' : 'none';
 
     Object.keys(AppStore.getUsers()).forEach(uid => {
         const u = AppStore.getUsers()[uid]; if (!u.approved) return;
         const card = document.createElement('div'); card.className = 'org-card' + (isAdmin ? ' draggable' : '');
         if (isAdmin) { card.draggable = true; card.ondragstart = (e) => e.dataTransfer.setData("uid", uid); }
-        card.innerHTML = `<img src="${u.photoURL || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect width='1' height='1' fill='%23E5E7EB'/%3E%3C/svg%3E"}" style="width: 54px; height: 54px; border-radius: 50%; object-fit: cover;"><div style="flex:1;font-weight:800;font-size:1.1rem;">${u.displayName}</div>${uid !== auth.currentUser.uid ? `<button onclick="openPrivateChat('${uid}', '${u.displayName}')" class="delete-btn" style="background:var(--col-bg);color:var(--text-muted);"><span class="material-symbols-rounded">chat</span></button>` : ''}`;
+        
+        const unreadBadge = uid !== auth.currentUser.uid ? `<div id="org-badge-${uid}" class="unread-badge" style="display:none; position:absolute; top:-5px; right:-5px; z-index:10; border:2px solid var(--card-bg);">0</div>` : '';
+        card.innerHTML = `<div style="position:relative; display:inline-block; width:54px; height:54px;"><img src="${u.photoURL || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect width='1' height='1' fill='%23E5E7EB'/%3E%3C/svg%3E"}" style="width: 54px; height: 54px; border-radius: 50%; object-fit: cover;">${unreadBadge}</div><div style="flex:1;font-weight:800;font-size:1.1rem; margin-left:1rem;">${u.displayName}</div>${uid !== auth.currentUser.uid ? `<button onclick="openPrivateChat('${uid}', '${u.displayName}')" class="delete-btn" style="background:var(--col-bg);color:var(--text-muted);"><span class="material-symbols-rounded">chat</span></button>` : ''}`;
         const target = document.getElementById('list-' + (u.department || 'unassigned')); if (target) target.appendChild(card);
     });
+    updateChatBadges(); // 렌더링 후 배지 상태 업데이트 적용
 }
 async function dropMember(ev, newDept) {
     ev.preventDefault(); const uid = ev.dataTransfer.getData("uid");
     if (uid) {
-        if (auth.currentUser.uid !== ADMIN_UID) return await customAlert('최고 관리자만 수정 가능합니다.');
+        if (!ADMIN_UIDS.includes(auth.currentUser.uid)) return await customAlert('최고 관리자만 수정 가능합니다.');
         db.ref('users/' + uid).update({ department: newDept });
     }
 }
@@ -598,6 +601,10 @@ function updateChatBadges() {
         totalUnread += count;
         const badgeEl = document.getElementById('badge-' + uid);
         if (badgeEl) { badgeEl.style.display = count > 0 ? 'block' : 'none'; badgeEl.textContent = count; }
+        
+        // 조직도 탭의 인물 프로필 우측 상단에도 배지 연동
+        const orgBadgeEl = document.getElementById('org-badge-' + uid);
+        if (orgBadgeEl) { orgBadgeEl.style.display = count > 0 ? 'block' : 'none'; orgBadgeEl.textContent = count; }
     });
     const globalBadge = document.getElementById('chat-global-badge');
     if (globalBadge) globalBadge.style.display = totalUnread > 0 ? 'block' : 'none';
@@ -619,9 +626,15 @@ function openPrivateChat(targetUid, targetName) {
     currentPrivateChatRef = db.ref(`privateChats/${getPrivateChatId(auth.currentUser.uid, targetUid)}`).orderByChild('timestamp').limitToLast(50);
     currentPrivateChatRef.on('value', (s) => {
         const chatBody = document.getElementById('private-chat-messages'); chatBody.innerHTML = '';
+        const now = Date.now();
+        const threeDaysMs = 3 * 24 * 60 * 60 * 1000; // 3일을 밀리초로 계산
+
         s.forEach(child => {
-            const msg = child.val(), isMine = msg.uid === auth.currentUser.uid;
+            const msg = child.val();
+            if (now - msg.timestamp > threeDaysMs) return; // 3일 지난 메시지는 화면에 표시하지 않음(초기화)
             
+            const isMine = msg.uid === auth.currentUser.uid;
+
             // 상대방 메시지를 읽었을 때 DB에 읽음(read: true) 업데이트 (카카오톡 숫자 1 사라지는 기능)
             if (!isMine && !msg.read && document.getElementById('private-chat-window').style.display === 'flex') {
                 child.ref.update({ read: true });
@@ -682,8 +695,14 @@ async function sendChatMessage() {
 db.ref('chatMessages').orderByChild('timestamp').limitToLast(50).on('value', (s) => {
     const chatBody = document.getElementById('chat-messages'); if (!chatBody) return; chatBody.innerHTML = '';
     let latestMsg = null;
+    const now = Date.now();
+    const threeDaysMs = 3 * 24 * 60 * 60 * 1000; // 3일을 밀리초로 계산
+
     s.forEach(child => {
-        const msg = child.val(), isMine = auth.currentUser && auth.currentUser.uid === msg.uid;
+        const msg = child.val();
+        if (now - msg.timestamp > threeDaysMs) return; // 3일 지난 메시지는 화면에 표시하지 않음(초기화)
+        
+        const isMine = auth.currentUser && auth.currentUser.uid === msg.uid;
         latestMsg = msg;
         const msgEl = document.createElement('div'); msgEl.className = `chat-message ${isMine ? 'mine' : 'others'}`;
         msgEl.innerHTML = `${!isMine ? `<div class="chat-sender">${msg.sender}</div>` : ''}<div class="chat-bubble">${msg.text}</div>`; chatBody.appendChild(msgEl);
@@ -712,19 +731,32 @@ function setupPrivateChatNotificationListeners() {
         if (targetUid === currentUid) return;
         const chatId = getPrivateChatId(currentUid, targetUid);
         if (!privateChatListeners[chatId]) {
-            db.ref(`privateChats/${chatId}`).orderByChild('timestamp').limitToLast(1).on('value', (s) => {
-                let msg = null; s.forEach(c => msg = c.val());
-                if (msg) {
-                    ChatLatestTracker.private[targetUid] = msg.timestamp;
+            // 🔥 로컬 저장이 아닌, DB에서 실제로 내가 안 읽은 메시지만 정확히 카운트합니다.
+            db.ref(`privateChats/${chatId}`).orderByChild('timestamp').limitToLast(50).on('value', (s) => {
+                let unreadCount = 0;
+                let latestMsg = null;
+                const now = Date.now();
+                const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+
+                s.forEach(c => {
+                    const msg = c.val();
+                    if (now - msg.timestamp > threeDaysMs) return; // 3일 지난 메시지는 무시
+                    latestMsg = msg;
+                    // 상대방이 보낸 메시지 중 아직 읽지 않은(read: false) 메시지의 개수를 셈
+                    if (msg.uid !== currentUid && !msg.read) unreadCount++;
+                });
+
+                ChatUnreadCount.private[targetUid] = unreadCount;
+                saveUnreadCounts();
+
+                if (latestMsg) {
                     const isOpen = currentPrivateChatTargetUid === targetUid && document.getElementById('private-chat-window').style.display === 'flex';
                     if (!ChatNotifiedTracker.private[targetUid]) ChatNotifiedTracker.private[targetUid] = Date.now();
                     
                     if (isOpen) {
                         ChatReadTracker.set(targetUid);
                         ChatNotifiedTracker.private[targetUid] = msg.timestamp;
-                    ChatUnreadCount.private[targetUid] = 0; saveUnreadCounts();
                     } else if (msg.timestamp > ChatNotifiedTracker.private[targetUid] && msg.uid !== currentUid) {
-                    ChatUnreadCount.private[targetUid] = (ChatUnreadCount.private[targetUid] || 0) + 1; saveUnreadCounts();
                         ChatNotifiedTracker.private[targetUid] = msg.timestamp;
                     }
                 }

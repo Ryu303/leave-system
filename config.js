@@ -2,7 +2,7 @@
 // ----------------------------------------------------
 // 전역 변수 (Global Variables)
 // ----------------------------------------------------
-const ADMIN_UID = "jaGugunGReXytCgbqYwQUybxyJL2"; 
+const ADMIN_UIDS = ["jaGugunGReXytCgbqYwQUybxyJL2", "hiPMcfj1OvWuq6PjedfPFvOLxlp2"]; 
 
 const AppStore = {
     state: {
@@ -53,7 +53,7 @@ const AppStore = {
             try { if(typeof renderLeaveUI === 'function') renderLeaveUI(); } catch(e){}
             try { if(typeof renderMyPage === 'function') renderMyPage(); } catch(e){}
             const user = firebase.auth().currentUser;
-            try { if(user && user.uid === ADMIN_UID && typeof renderAdminLeaves === 'function') renderAdminLeaves(); } catch(e){}
+            try { if(user && ADMIN_UIDS.includes(user.uid) && typeof renderAdminLeaves === 'function') renderAdminLeaves(); } catch(e){}
         }, 0);
     },
     getUsers: function() { return this.state.users; },
@@ -63,7 +63,7 @@ const AppStore = {
         if(typeof renderChatList === 'function') renderChatList();
         if(typeof setupPrivateChatNotificationListeners === 'function') setupPrivateChatNotificationListeners();
         const user = firebase.auth().currentUser;
-        if(user && user.uid === ADMIN_UID && typeof renderAdminLeaves === 'function') renderAdminLeaves();
+        if(user && ADMIN_UIDS.includes(user.uid) && typeof renderAdminLeaves === 'function') renderAdminLeaves();
     },
     getNotices: function() { return this.state.notices; },
     setNotices: function(newData) {
@@ -232,7 +232,7 @@ function switchTab(tabId, element) {
     document.getElementById(tabId).style.display = 'block';
     
     // 탭 전환 시 화면을 강제로 최신화하여 즉각 반영 (F5 방지)
-    if (tabId === 'tab-admin' && auth.currentUser && auth.currentUser.uid === ADMIN_UID) {
+    if (tabId === 'tab-admin' && auth.currentUser && ADMIN_UIDS.includes(auth.currentUser.uid)) {
         if (typeof renderAdminLeaves === 'function') renderAdminLeaves();
     } else if (tabId === 'tab-leaves') {
         if (typeof renderLeaveUI === 'function') renderLeaveUI();

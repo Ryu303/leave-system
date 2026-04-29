@@ -33,7 +33,7 @@ function openTripModal(id = null, name = '', date = '', assignee = '', contact =
     // 관리자이거나 본인이 작성한 출장이면 모달 내 삭제 버튼 표시
     const delBtn = document.getElementById('tripModalDeleteBtn');
     if (delBtn) {
-        const isAdmin = auth.currentUser && auth.currentUser.uid === ADMIN_UID;
+        const isAdmin = auth.currentUser && ADMIN_UIDS.includes(auth.currentUser.uid);
         const isAuthor = trip && trip.author === (AppStore.getCurrentUser() ? AppStore.getCurrentUser().displayName : '');
         delBtn.style.display = (isAdmin || isAuthor) ? 'inline-block' : 'none';
     }

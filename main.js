@@ -33,7 +33,7 @@ auth.onAuthStateChanged((user) => {
                 userRef.set(profileData);
             } else {
                 profileData = snapshot.val();
-                if (user.uid === ADMIN_UID && !profileData.approved) {
+                if (ADMIN_UIDS.includes(user.uid) && !profileData.approved) {
                     db.ref('users/' + user.uid).update({ approved: true });
                     profileData.approved = true;
                 }
@@ -47,7 +47,7 @@ auth.onAuthStateChanged((user) => {
 
             updateUIPermissions(user, AppStore.getCurrentUser());
 
-            if (user.uid === ADMIN_UID) {
+            if (ADMIN_UIDS.includes(user.uid)) {
                 document.getElementById('tab-btn-admin').style.display = 'inline-block';
                 listenForUsers(); 
                 if(typeof renderAdminLeaves === 'function') renderAdminLeaves();
@@ -135,11 +135,11 @@ function listenForUsers() {
             const safeName = user.displayName ? user.displayName.replace(/'/g, "\\'") : '이름없음';
             
             if (!user.approved) {
-                li.innerHTML = `<span>${user.displayName} <small style="color: var(--text-muted); font-weight: normal;">(${user.email})</small></span><div style="display:flex; gap:0.5rem;"><button onclick="approveUser('${uid}', '${safeName}')">승인</button><button class="revoke-btn" onclick="deleteUser('${uid}', '${safeName}')">삭제</button></div>`;
+                li.innerHTML = `<span>${user.displayName} <small style="color: var(--text-muted); font-weight: normal;">(${user.email} / UID: <span style="user-select:all; background:var(--bg-color); padding:2px 4px; border-radius:4px; font-family:monospace;">${uid}</span>)</small></span><div style="display:flex; gap:0.5rem;"><button onclick="approveUser('${uid}', '${safeName}')">승인</button><button class="revoke-btn" onclick="deleteUser('${uid}', '${safeName}')">삭제</button></div>`;
                 approvalListEl.appendChild(li); pendingCount++;
             } else {
-                const actionBtn = uid === ADMIN_UID ? `<span style="font-size: 0.8rem; color: var(--primary); font-weight: bold;">최고 관리자</span>` : `<button class="revoke-btn" onclick="revokeUser('${uid}', '${safeName}')">해제</button>`;
-                li.innerHTML = `<span>${user.displayName} <small style="color: var(--text-muted); font-weight: normal;">(${user.email})</small></span>${actionBtn}`;
+                const actionBtn = ADMIN_UIDS.includes(uid) ? `<span style="font-size: 0.8rem; color: var(--primary); font-weight: bold;">최고 관리자</span>` : `<button class="revoke-btn" onclick="revokeUser('${uid}', '${safeName}')">해제</button>`;
+                li.innerHTML = `<span>${user.displayName} <small style="color: var(--text-muted); font-weight: normal;">(${user.email} / UID: <span style="user-select:all; background:var(--bg-color); padding:2px 4px; border-radius:4px; font-family:monospace;">${uid}</span>)</small></span>${actionBtn}`;
                 memberListEl.appendChild(li); memberCount++;
             }
         });
@@ -206,7 +206,7 @@ document.addEventListener('visibilitychange', () => {
             try { if (typeof renderLeaveUI === 'function') renderLeaveUI(); } catch(e){}
             try { if (typeof renderNotices === 'function') renderNotices(); } catch(e){}
             const user = firebase.auth().currentUser;
-            try { if(user && user.uid === ADMIN_UID && typeof renderAdminLeaves === 'function') renderAdminLeaves(); } catch(e){}
+            try { if(user && ADMIN_UIDS.includes(user.uid) && typeof renderAdminLeaves === 'function') renderAdminLeaves(); } catch(e){}
         }, 100);
     }
 });

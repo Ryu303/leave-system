@@ -163,7 +163,7 @@ function openModal(taskId, title, description, dueDate, startDate) {
     // 관리자이거나 본인이 작성한 업무면 모달 내 삭제 버튼 표시
     const delBtn = document.getElementById('modalDeleteBtn');
     if (delBtn) {
-        const isAdmin = auth.currentUser && auth.currentUser.uid === ADMIN_UID;
+        const isAdmin = auth.currentUser && ADMIN_UIDS.includes(auth.currentUser.uid);
         const isAuthor = task && task.author === (AppStore.getCurrentUser() ? AppStore.getCurrentUser().displayName : '');
         delBtn.style.display = (isAdmin || isAuthor) ? 'inline-block' : 'none';
     }
