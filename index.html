@@ -190,7 +190,7 @@
                     <div id="editor-container"></div>
                 </div>
 
-                <div class="section files-section">
+                <div class="section files-section" id="drive-drop-zone">
                     <h2>공유 드라이브</h2>
                     <div class="upload-area">
                         <input type="file" id="fileInput" class="file-input-hidden" onchange="updateFileName('fileInput', 'fileNameDisplay')">
@@ -421,16 +421,16 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 0.75rem; border-bottom: 2px solid var(--bg-color);">
                     <h2 style="margin: 0; padding: 0; border: none;"><span class="material-symbols-rounded" style="vertical-align:bottom; margin-right:6px;">person</span>내 업무 및 일정 (마이페이지)</h2>
                 </div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem;">
-                    <div style="background-color: var(--card-bg); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px; box-shadow: var(--shadow-sm);">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; align-items: start;">
+                    <div style="background-color: var(--card-bg); border: 1px solid var(--border-color); padding: 1.2rem; border-radius: 12px; box-shadow: var(--shadow-sm);">
                         <h3 style="font-size: 1.05rem; margin-top: 0; margin-bottom: 1rem; color: var(--primary); display: flex; align-items: center; gap: 6px;"><span class="material-symbols-rounded">work</span> 내 업무</h3>
-                        <ul id="mypage-tasks" class="user-list" style="max-height: 400px; overflow-y: auto;"></ul>
+                        <ul id="mypage-tasks" class="user-list" style="max-height: 280px; overflow-y: auto; padding-right: 4px;"></ul>
                     </div>
-                    <div style="background-color: var(--card-bg); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px; box-shadow: var(--shadow-sm);">
+                    <div style="background-color: var(--card-bg); border: 1px solid var(--border-color); padding: 1.2rem; border-radius: 12px; box-shadow: var(--shadow-sm);">
                         <h3 style="font-size: 1.05rem; margin-top: 0; margin-bottom: 1rem; color: #8B5CF6; display: flex; align-items: center; gap: 6px;"><span class="material-symbols-rounded">flight_takeoff</span> 내 출장 일정</h3>
-                        <ul id="mypage-trips" class="user-list" style="max-height: 400px; overflow-y: auto;"></ul>
+                        <ul id="mypage-trips" class="user-list" style="max-height: 280px; overflow-y: auto; padding-right: 4px;"></ul>
                     </div>
-                    <div style="background-color: var(--card-bg); border: 1px solid var(--border-color); padding: 1.5rem; border-radius: 12px; box-shadow: var(--shadow-sm);">
+                    <div style="background-color: var(--card-bg); border: 1px solid var(--border-color); padding: 1.2rem; border-radius: 12px; box-shadow: var(--shadow-sm);">
                         <h3 style="font-size: 1.05rem; margin-top: 0; margin-bottom: 1rem; color: #10B981; display: flex; align-items: center; gap: 6px;"><span class="material-symbols-rounded">beach_access</span> 내 휴가 결재</h3>
                         <div class="calendar-controls" style="margin-bottom: 0.8rem;">
                             <button onclick="changeMyPageMonth(-1)" style="padding: 0.3rem; font-size: 0.8rem;"><span class="material-symbols-rounded" style="vertical-align:middle;">chevron_left</span></button>
@@ -439,7 +439,7 @@
                         </div>
                         <div class="calendar-grid" id="mypage-calendar-grid"></div>
                         <hr style="border: 0; border-top: 1px dashed var(--border-color); margin: 1rem 0;">
-                        <ul id="mypage-leaves-list" class="user-list" style="max-height: 150px; overflow-y: auto;"></ul>
+                        <ul id="mypage-leaves-list" class="user-list" style="max-height: 150px; overflow-y: auto; padding-right: 4px;"></ul>
                     </div>
                 </div>
             </div>

@@ -542,7 +542,7 @@ select option {
 
 /* 마이페이지 미니 캘린더용 */
 .mypage-calendar-day {
-    background-color: var(--card-bg); height: 80px; padding: 0.3rem; display: flex; flex-direction: column; gap: 0.2rem; overflow-y: auto;
+    background-color: var(--card-bg); height: 45px; padding: 2px; display: flex; flex-direction: column; gap: 1px; overflow-y: auto;
 }
 .mypage-calendar-day:hover { background-color: var(--col-bg); }
 
@@ -646,6 +646,15 @@ select option {
     font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 20;
     vertical-align: middle;
 }
+
+/* 파일 드래그 앤 드롭 효과 */
+#drive-drop-zone { position: relative; transition: background-color 0.2s, outline 0.2s; }
+#drive-drop-zone.dragover {
+    outline: 2px dashed var(--primary);
+    outline-offset: -4px;
+    background-color: rgba(99, 102, 241, 0.05);
+}
+#drive-drop-zone.dragover * { pointer-events: none; } /* 깜빡임 방지 */
 
 .file-delete-btn {
     padding: 0.3rem 0.6rem;

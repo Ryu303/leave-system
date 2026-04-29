@@ -494,6 +494,23 @@ db.ref('files').orderByKey().limitToLast(100).on('value', (s) => {
     });
 });
 
+// 드래그 앤 드롭 파일 업로드 이벤트
+setTimeout(() => {
+    const dropZone = document.getElementById('drive-drop-zone');
+    if (dropZone) {
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault(); dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                document.getElementById('fileInput').files = e.dataTransfer.files;
+                updateFileName('fileInput', 'fileNameDisplay');
+                uploadFile(); // 드롭과 동시에 버튼 누를 필요 없이 자동 업로드 실행
+            }
+        });
+    }
+}, 500);
+
 // ----------------------------------------------------
 // 조직도(팀원 목록) 및 채팅 기능
 // ----------------------------------------------------
