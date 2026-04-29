@@ -233,6 +233,7 @@ function renderTripList() {
             } else if (checkStr.includes('휴노')) {
                 categoryBadge = `<span style="font-size:0.7rem; background-color:#F0FDF4; color:#16A34A; padding:2px 6px; border-radius:4px; margin-left:4px; font-weight:bold; vertical-align:middle; border:1px solid #BBF7D0;">🌿 휴노</span>`;
             } else if (trip.category.toUpperCase().startsWith('VIP')) {
+            } else if (trip.category && trip.category.toUpperCase().startsWith('VIP')) {
                 categoryBadge = `<span style="font-size:0.7rem; background-color:#FFFBEB; color:#F59E0B; padding:2px 6px; border-radius:4px; margin-left:4px; font-weight:bold; vertical-align:middle; border:1px solid #FEF3C7;">⭐ VIP</span>`;
             }
         }

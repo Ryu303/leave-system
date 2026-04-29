@@ -483,13 +483,40 @@ async function deleteFile(fileId, filePath) {
     if (!await customConfirm('삭제하시겠습니까?')) return;
     storage.ref(filePath).delete().then(() => db.ref('files/' + fileId).remove());
 }
+
+// 파일 강제 다운로드 로직 추가
+async function forceDownload(url, fileName) {
+    showToast('파일 다운로드를 시작합니다...', 'info');
+    try {
+        // 🔥 파이어베이스 다운로드 URL에 임의로 글자를 추가하면 보안 토큰이 깨지므로 원본 URL을 그대로 사용합니다.
+        const response = await fetch(url, { 
+            cache: 'no-store' 
+        });
+        if (!response.ok) throw new Error('네트워크 응답 오류: ' + response.status);
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = blobUrl;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+        console.error('CORS 또는 네트워크 에러로 브라우저 기본 동작 실행:', e);
+        window.open(url, '_blank');
+    }
+}
+
 // 파일 목록 최적화: 최신 100개만 로드
 db.ref('files').orderByKey().limitToLast(100).on('value', (s) => {
     const list = document.getElementById('fileList'); list.innerHTML = '';
     const data = s.val(); if (!data) return;
     for(let key in data) data[key].id = key; // 진짜 DB 키로 강제 동기화
     Object.values(data).sort((a,b) => b.timestamp - a.timestamp).forEach(f => {
-        const li = document.createElement('li'); li.innerHTML = `<a href="${f.url}" target="_blank" title="업로드: ${f.uploader || '알 수 없음'}">${f.name}</a> ${f.path ? `<button class="delete-btn" onclick="deleteFile('${f.id}', '${f.path}')">삭제</button>` : ''}`;
+        const safeName = f.name ? f.name.replace(/'/g, "\\'").replace(/"/g, "&quot;") : 'download';
+        const li = document.createElement('li'); li.innerHTML = `<a href="javascript:void(0)" onclick="forceDownload('${f.url}', '${safeName}')" title="업로드: ${f.uploader || '알 수 없음'}">${f.name}</a> ${f.path ? `<button class="delete-btn" onclick="deleteFile('${f.id}', '${f.path}')">삭제</button>` : ''}`;
         list.appendChild(li);
     });
 });
@@ -541,6 +568,33 @@ async function dropMember(ev, newDept) {
 }
 function allowDrop(ev) { ev.preventDefault(); }
 
+// --- 새 메시지 배지 및 알림 추적 로직 ---
+const ChatReadTracker = {
+    get: (id) => parseInt(localStorage.getItem('chat_read_' + id) || '0'),
+    set: (id) => { localStorage.setItem('chat_read_' + id, Date.now().toString()); updateChatBadges(); }
+};
+const ChatLatestTracker = { group: 0, private: {} };
+const ChatNotifiedTracker = { group: Date.now(), private: {} };
+
+function updateChatBadges() {
+    let totalUnread = 0;
+    // 단체방 배지 업데이트
+    const groupUnread = ChatLatestTracker.group > ChatReadTracker.get('group');
+    if (groupUnread) totalUnread++;
+    const groupBadgeEl = document.getElementById('badge-group');
+    if (groupBadgeEl) groupBadgeEl.style.display = groupUnread ? 'block' : 'none';
+    // 개인방 배지 업데이트
+    Object.keys(ChatLatestTracker.private).forEach(uid => {
+        const isUnread = ChatLatestTracker.private[uid] > ChatReadTracker.get(uid);
+        if (isUnread) totalUnread++;
+        const badgeEl = document.getElementById('badge-' + uid);
+        if (badgeEl) badgeEl.style.display = isUnread ? 'block' : 'none';
+    });
+    // 메인 플로팅 버튼 빨간 점 업데이트
+    const globalBadge = document.getElementById('chat-global-badge');
+    if (globalBadge) globalBadge.style.display = totalUnread > 0 ? 'block' : 'none';
+}
+
 let currentPrivateChatTargetUid = null, currentPrivateChatRef = null;
 function getPrivateChatId(uid1, uid2) { return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`; }
 
@@ -548,6 +602,7 @@ function openPrivateChat(targetUid, targetName) {
     currentPrivateChatTargetUid = targetUid;
     document.getElementById('chat-list-window').style.display = 'none'; document.getElementById('chat-window').style.display = 'none';
     document.getElementById('private-chat-title').textContent = `${targetName}님과 채팅`; document.getElementById('private-chat-window').style.display = 'flex';
+    ChatReadTracker.set(targetUid); // 열면 즉시 읽음 처리
     if (currentPrivateChatRef) currentPrivateChatRef.off();
     
     currentPrivateChatRef = db.ref(`privateChats/${getPrivateChatId(auth.currentUser.uid, targetUid)}`).orderByChild('timestamp').limitToLast(50);
@@ -577,22 +632,21 @@ function toggleChatListWindow() {
     if (listWindow.style.display === 'none' || listWindow.style.display === '') { listWindow.style.display = 'flex'; renderChatList(); } else listWindow.style.display = 'none';
 }
 function backToChatList() { document.getElementById('chat-window').style.display = 'none'; closePrivateChat(); document.getElementById('chat-list-window').style.display = 'flex'; }
-function openGroupChat() { document.getElementById('chat-list-window').style.display = 'none'; document.getElementById('chat-window').style.display = 'flex'; setTimeout(() => document.getElementById('chat-input').focus(), 100); }
-
+function openGroupChat() { document.getElementById('chat-list-window').style.display = 'none'; document.getElementById('chat-window').style.display = 'flex'; setTimeout(() => document.getElementById('chat-input').focus(), 100); 
 function renderChatList() {
     const currentUserProfile = AppStore.getCurrentUser();
     const listBody = document.getElementById('chat-list-body'); if (!listBody) return; listBody.innerHTML = '';
     if (!auth.currentUser || !currentUserProfile || !currentUserProfile.approved) return;
     
     const groupItem = document.createElement('div'); groupItem.className = 'chat-list-item'; groupItem.onclick = openGroupChat;
-    groupItem.innerHTML = `<div style="width:48px;height:48px;border-radius:18px;background:var(--primary);color:white;display:flex;justify-content:center;align-items:center;margin-right:12px;"><span class="material-symbols-rounded">groups</span></div><div style="flex:1;font-weight:700;">사내 단체 채팅방</div>`; listBody.appendChild(groupItem);
-    
+    groupItem.innerHTML = `<div style="width:48px;height:48px;border-radius:18px;background:var(--primary);color:white;disp
     Object.keys(AppStore.getUsers()).forEach(uid => {
         if (uid === auth.currentUser.uid) return;
         const u = AppStore.getUsers()[uid]; if (!u.approved) return;
         const item = document.createElement('div'); item.className = 'chat-list-item'; item.onclick = () => openPrivateChat(uid, u.displayName);
-        item.innerHTML = `<img src="${u.photoURL || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect width='1' height='1' fill='%23E5E7EB'/%3E%3C/svg%3E"}" style="width:48px;height:48px;border-radius:18px;margin-right:12px; object-fit: cover;"><div style="flex:1;font-weight:600;">${u.displayName}</div>`; listBody.appendChild(item);
+        item.innerHTML = `<img src="${u.photoURL || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect width='1' height='1' fill='%23E5E7EB'/%3E%3C/svg%3E"}" style="width:48px;height:48px;border-radius:18px;margin-right:12px; object-fit: cover;"><div style="flex:1;font-weight:600;">${u.displayName}</div><div id="badge-${uid}" class="unread-badge" style="display:none;">N</div>`; listBody.appendChild(item);
     });
+    updateChatBadges(); // 렌더링 즉시 배지 상태 점검
 }
 function handleChatEnter(event) { if (event.key === 'Enter') { event.preventDefault(); sendChatMessage(); } }
 async function sendChatMessage() {
@@ -601,28 +655,56 @@ async function sendChatMessage() {
     db.ref('chatMessages').push({ uid: auth.currentUser.uid, sender: currentUserProfile.displayName, text: text, timestamp: Date.now() });
     document.getElementById('chat-input').value = '';
 }
+
+// 단체 채팅 알림 및 리스너
 db.ref('chatMessages').orderByChild('timestamp').limitToLast(50).on('value', (s) => {
     const chatBody = document.getElementById('chat-messages'); if (!chatBody) return; chatBody.innerHTML = '';
+    let latestMsg = null;
     s.forEach(child => {
         const msg = child.val(), isMine = auth.currentUser && auth.currentUser.uid === msg.uid;
+        latestMsg = msg;
         const msgEl = document.createElement('div'); msgEl.className = `chat-message ${isMine ? 'mine' : 'others'}`;
         msgEl.innerHTML = `${!isMine ? `<div class="chat-sender">${msg.sender}</div>` : ''}<div class="chat-bubble">${msg.text}</div>`; chatBody.appendChild(msgEl);
     });
     setTimeout(() => chatBody.scrollTop = chatBody.scrollHeight, 10);
+
+    if (latestMsg) {
+        ChatLatestTracker.group = latestMsg.timestamp;
+        const isOpen = document.getElementById('chat-window').style.display === 'flex';
+        if (isOpen) {
+            ChatReadTracker.set('group');
+            ChatNotifiedTracker.group = latestMsg.timestamp;
+        } else if (latestMsg.timestamp > ChatNotifiedTracker.group && auth.currentUser && latestMsg.uid !== auth.currentUser.uid) {
+            showToast(`📢 단체방 (${latestMsg.sender}):\n${latestMsg.text}`, 'info');
+            ChatNotifiedTracker.group = latestMsg.timestamp;
+        }
+        updateChatBadges();
+    }
 });
 
-let privateChatListeners = {}, initTimeForPrivateChats = Date.now();
+// 1:1 개인 채팅 알림 및 리스너
+let privateChatListeners = {};
 function setupPrivateChatNotificationListeners() {
     const currentUid = auth.currentUser ? auth.currentUser.uid : null; if (!currentUid) return;
     Object.keys(AppStore.getUsers()).forEach(targetUid => {
         if (targetUid === currentUid) return;
         const chatId = getPrivateChatId(currentUid, targetUid);
         if (!privateChatListeners[chatId]) {
-            db.ref(`privateChats/${chatId}`).limitToLast(1).on('child_added', (s) => {
-                const msg = s.val();
-                if (msg && msg.uid !== currentUid && msg.timestamp > initTimeForPrivateChats) {
-                    showToast(`💬 ${AppStore.getUsers()[targetUid].displayName}님:\n${msg.text}`, 'info');
-                    if (currentPrivateChatTargetUid !== targetUid) openPrivateChat(targetUid, AppStore.getUsers()[targetUid].displayName);
+            db.ref(`privateChats/${chatId}`).orderByChild('timestamp').limitToLast(1).on('value', (s) => {
+                let msg = null; s.forEach(c => msg = c.val());
+                if (msg) {
+                    ChatLatestTracker.private[targetUid] = msg.timestamp;
+                    const isOpen = currentPrivateChatTargetUid === targetUid && document.getElementById('private-chat-window').style.display === 'flex';
+                    if (!ChatNotifiedTracker.private[targetUid]) ChatNotifiedTracker.private[targetUid] = Date.now();
+                    
+                    if (isOpen) {
+                        ChatReadTracker.set(targetUid);
+                        ChatNotifiedTracker.private[targetUid] = msg.timestamp;
+                    } else if (msg.timestamp > ChatNotifiedTracker.private[targetUid] && msg.uid !== currentUid) {
+                        showToast(`💬 ${AppStore.getUsers()[targetUid].displayName}님:\n${msg.text}`, 'info');
+                        ChatNotifiedTracker.private[targetUid] = msg.timestamp;
+                    }
+                    updateChatBadges();
                 }
             });
             privateChatListeners[chatId] = true;

@@ -1019,6 +1019,27 @@ select option {
     .notice-item-views::before { content: '조회수: '; }
 }
 
+/* 새 메시지 배지 (채팅 목록 우측) */
+.unread-badge {
+    background-color: var(--danger);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 12px;
+    margin-left: auto;
+    box-shadow: var(--shadow-sm);
+}
+/* 둥근 메인 채팅 버튼에 붙는 빨간 점 */
+.chat-toggle-badge {
+    position: absolute;
+    top: 2px; right: 2px;
+    width: 12px; height: 12px;
+    background-color: var(--danger);
+    border-radius: 50%;
+    border: 2px solid var(--card-bg);
+}
+
 /* ==================== 
    조직도 (Organization Chart)
 ==================== */
