@@ -571,26 +571,34 @@ function allowDrop(ev) { ev.preventDefault(); }
 // --- 새 메시지 배지 및 알림 추적 로직 ---
 const ChatReadTracker = {
     get: (id) => parseInt(localStorage.getItem('chat_read_' + id) || '0'),
-    set: (id) => { localStorage.setItem('chat_read_' + id, Date.now().toString()); updateChatBadges(); }
+    set: (id) => { localStorage.setItem('chat_read_' + id, Date.now().toString()); }
 };
 const ChatLatestTracker = { group: 0, private: {} };
 const ChatNotifiedTracker = { group: Date.now(), private: {} };
 
+let safePrivateUnread = {};
+try { safePrivateUnread = JSON.parse(localStorage.getItem('unread_private') || '{}'); } catch(e) {}
+const ChatUnreadCount = {
+    group: parseInt(localStorage.getItem('unread_group') || '0') || 0,
+    private: safePrivateUnread
+};
+function saveUnreadCounts() {
+    localStorage.setItem('unread_group', ChatUnreadCount.group);
+    localStorage.setItem('unread_private', JSON.stringify(ChatUnreadCount.private));
+    updateChatBadges();
+}
+
 function updateChatBadges() {
-    let totalUnread = 0;
-    // 단체방 배지 업데이트
-    const groupUnread = ChatLatestTracker.group > ChatReadTracker.get('group');
-    if (groupUnread) totalUnread++;
+    let totalUnread = ChatUnreadCount.group;
     const groupBadgeEl = document.getElementById('badge-group');
-    if (groupBadgeEl) groupBadgeEl.style.display = groupUnread ? 'block' : 'none';
-    // 개인방 배지 업데이트
-    Object.keys(ChatLatestTracker.private).forEach(uid => {
-        const isUnread = ChatLatestTracker.private[uid] > ChatReadTracker.get(uid);
-        if (isUnread) totalUnread++;
+    if (groupBadgeEl) { groupBadgeEl.style.display = ChatUnreadCount.group > 0 ? 'block' : 'none'; groupBadgeEl.textContent = ChatUnreadCount.group; }
+    
+    Object.keys(AppStore.getUsers()).forEach(uid => {
+        const count = ChatUnreadCount.private[uid] || 0;
+        totalUnread += count;
         const badgeEl = document.getElementById('badge-' + uid);
-        if (badgeEl) badgeEl.style.display = isUnread ? 'block' : 'none';
+        if (badgeEl) { badgeEl.style.display = count > 0 ? 'block' : 'none'; badgeEl.textContent = count; }
     });
-    // 메인 플로팅 버튼 빨간 점 업데이트
     const globalBadge = document.getElementById('chat-global-badge');
     if (globalBadge) globalBadge.style.display = totalUnread > 0 ? 'block' : 'none';
 }
@@ -602,7 +610,10 @@ function openPrivateChat(targetUid, targetName) {
     currentPrivateChatTargetUid = targetUid;
     document.getElementById('chat-list-window').style.display = 'none'; document.getElementById('chat-window').style.display = 'none';
     document.getElementById('private-chat-title').textContent = `${targetName}님과 채팅`; document.getElementById('private-chat-window').style.display = 'flex';
+    
     ChatReadTracker.set(targetUid); // 열면 즉시 읽음 처리
+    ChatUnreadCount.private[targetUid] = 0; saveUnreadCounts();
+    
     if (currentPrivateChatRef) currentPrivateChatRef.off();
     
     currentPrivateChatRef = db.ref(`privateChats/${getPrivateChatId(auth.currentUser.uid, targetUid)}`).orderByChild('timestamp').limitToLast(50);
@@ -610,8 +621,17 @@ function openPrivateChat(targetUid, targetName) {
         const chatBody = document.getElementById('private-chat-messages'); chatBody.innerHTML = '';
         s.forEach(child => {
             const msg = child.val(), isMine = msg.uid === auth.currentUser.uid;
+            
+            // 상대방 메시지를 읽었을 때 DB에 읽음(read: true) 업데이트 (카카오톡 숫자 1 사라지는 기능)
+            if (!isMine && !msg.read && document.getElementById('private-chat-window').style.display === 'flex') {
+                child.ref.update({ read: true });
+            }
+            
             const msgEl = document.createElement('div'); msgEl.className = `chat-message ${isMine ? 'mine' : 'others'}`;
-            msgEl.innerHTML = `${!isMine ? `<div class="chat-sender">${msg.sender}</div>` : ''}<div class="chat-bubble">${msg.text}</div>`;
+            const readMark = (isMine && !msg.read) ? `<span style="font-size:0.75rem; color:#F59E0B; font-weight:bold; margin:0 4px 2px 4px;">1</span>` : '';
+            
+            if (isMine) msgEl.innerHTML = `<div style="display:flex; align-items:flex-end;">${readMark}<div class="chat-bubble">${msg.text}</div></div>`;
+            else msgEl.innerHTML = `<div class="chat-sender">${msg.sender}</div><div class="chat-bubble">${msg.text}</div>`;
             chatBody.appendChild(msgEl);
         });
         setTimeout(() => chatBody.scrollTop = chatBody.scrollHeight, 10);
@@ -622,7 +642,7 @@ function handlePrivateChatEnter(event) { if (event.key === 'Enter') { event.prev
 async function sendPrivateMessage() {
     const currentUserProfile = AppStore.getCurrentUser();
     const text = document.getElementById('private-chat-input').value.trim(); if (!text || !currentPrivateChatTargetUid) return;
-    db.ref(`privateChats/${getPrivateChatId(auth.currentUser.uid, currentPrivateChatTargetUid)}`).push({ uid: auth.currentUser.uid, sender: currentUserProfile.displayName, text: text, timestamp: Date.now() });
+    db.ref(`privateChats/${getPrivateChatId(auth.currentUser.uid, currentPrivateChatTargetUid)}`).push({ uid: auth.currentUser.uid, sender: currentUserProfile.displayName, text: text, timestamp: Date.now(), read: false });
     document.getElementById('private-chat-input').value = '';
 }
 
@@ -632,19 +652,21 @@ function toggleChatListWindow() {
     if (listWindow.style.display === 'none' || listWindow.style.display === '') { listWindow.style.display = 'flex'; renderChatList(); } else listWindow.style.display = 'none';
 }
 function backToChatList() { document.getElementById('chat-window').style.display = 'none'; closePrivateChat(); document.getElementById('chat-list-window').style.display = 'flex'; }
-function openGroupChat() { document.getElementById('chat-list-window').style.display = 'none'; document.getElementById('chat-window').style.display = 'flex'; setTimeout(() => document.getElementById('chat-input').focus(), 100); 
+function openGroupChat() { document.getElementById('chat-list-window').style.display = 'none'; document.getElementById('chat-window').style.display = 'flex'; setTimeout(() => document.getElementById('chat-input').focus(), 100); ChatReadTracker.set('group'); ChatUnreadCount.group = 0; saveUnreadCounts(); }
+
 function renderChatList() {
     const currentUserProfile = AppStore.getCurrentUser();
     const listBody = document.getElementById('chat-list-body'); if (!listBody) return; listBody.innerHTML = '';
     if (!auth.currentUser || !currentUserProfile || !currentUserProfile.approved) return;
     
     const groupItem = document.createElement('div'); groupItem.className = 'chat-list-item'; groupItem.onclick = openGroupChat;
-    groupItem.innerHTML = `<div style="width:48px;height:48px;border-radius:18px;background:var(--primary);color:white;disp
+    groupItem.innerHTML = `<div style="width:48px;height:48px;border-radius:18px;background:var(--primary);color:white;display:flex;justify-content:center;align-items:center;margin-right:12px;"><span class="material-symbols-rounded">groups</span></div><div style="flex:1;font-weight:700;">사내 단체 채팅방</div><div id="badge-group" class="unread-badge" style="display:none;">0</div>`; listBody.appendChild(groupItem);
+
     Object.keys(AppStore.getUsers()).forEach(uid => {
         if (uid === auth.currentUser.uid) return;
         const u = AppStore.getUsers()[uid]; if (!u.approved) return;
         const item = document.createElement('div'); item.className = 'chat-list-item'; item.onclick = () => openPrivateChat(uid, u.displayName);
-        item.innerHTML = `<img src="${u.photoURL || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect width='1' height='1' fill='%23E5E7EB'/%3E%3C/svg%3E"}" style="width:48px;height:48px;border-radius:18px;margin-right:12px; object-fit: cover;"><div style="flex:1;font-weight:600;">${u.displayName}</div><div id="badge-${uid}" class="unread-badge" style="display:none;">N</div>`; listBody.appendChild(item);
+        item.innerHTML = `<img src="${u.photoURL || "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect width='1' height='1' fill='%23E5E7EB'/%3E%3C/svg%3E"}" style="width:48px;height:48px;border-radius:18px;margin-right:12px; object-fit: cover;"><div style="flex:1;font-weight:600;">${u.displayName}</div><div id="badge-${uid}" class="unread-badge" style="display:none;">0</div>`; listBody.appendChild(item);
     });
     updateChatBadges(); // 렌더링 즉시 배지 상태 점검
 }
@@ -674,11 +696,11 @@ db.ref('chatMessages').orderByChild('timestamp').limitToLast(50).on('value', (s)
         if (isOpen) {
             ChatReadTracker.set('group');
             ChatNotifiedTracker.group = latestMsg.timestamp;
+            ChatUnreadCount.group = 0; saveUnreadCounts();
         } else if (latestMsg.timestamp > ChatNotifiedTracker.group && auth.currentUser && latestMsg.uid !== auth.currentUser.uid) {
-            showToast(`📢 단체방 (${latestMsg.sender}):\n${latestMsg.text}`, 'info');
+            ChatUnreadCount.group++; saveUnreadCounts();
             ChatNotifiedTracker.group = latestMsg.timestamp;
         }
-        updateChatBadges();
     }
 });
 
@@ -700,11 +722,11 @@ function setupPrivateChatNotificationListeners() {
                     if (isOpen) {
                         ChatReadTracker.set(targetUid);
                         ChatNotifiedTracker.private[targetUid] = msg.timestamp;
+                    ChatUnreadCount.private[targetUid] = 0; saveUnreadCounts();
                     } else if (msg.timestamp > ChatNotifiedTracker.private[targetUid] && msg.uid !== currentUid) {
-                        showToast(`💬 ${AppStore.getUsers()[targetUid].displayName}님:\n${msg.text}`, 'info');
+                    ChatUnreadCount.private[targetUid] = (ChatUnreadCount.private[targetUid] || 0) + 1; saveUnreadCounts();
                         ChatNotifiedTracker.private[targetUid] = msg.timestamp;
                     }
-                    updateChatBadges();
                 }
             });
             privateChatListeners[chatId] = true;
