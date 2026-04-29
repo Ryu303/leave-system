@@ -215,6 +215,9 @@ db.ref('businessTrips').orderByKey().limitToLast(300).on('value', (s) => {
 
 function renderTripList() {
     const list = document.getElementById('trip-list'); if (!list) return; list.innerHTML = '';
+    const pastList = document.getElementById('trip-list-past'); if (!pastList) return; pastList.innerHTML = '';
+    
+    const todayTime = new Date().setHours(0,0,0,0);
     Object.values(AppStore.getTrips()).sort((a,b) => (a.date ? new Date(a.date).getTime() : Infinity) - (b.date ? new Date(b.date).getTime() : Infinity)).forEach(trip => {
         const div = document.createElement('div'); div.className = 'trip-card';
         
@@ -239,7 +242,8 @@ function renderTripList() {
         }
 
         div.title = trip.author ? `등록자: ${trip.author}` : '';
-        if (trip.date && new Date(trip.date).setHours(0,0,0,0) < new Date().setHours(0,0,0,0)) div.classList.add('past-trip');
+        const isPast = trip.date && new Date(trip.date).setHours(0,0,0,0) < todayTime;
+        if (isPast) div.classList.add('past-trip');
         div.innerHTML = `<div class="trip-header"><div style="display:flex; align-items:flex-start; gap:10px;"><input type="checkbox" class="trip-checkbox" value="${trip.id}" style="width:18px; height:18px; margin-top:2px; cursor:pointer;" title="동선 최적화 선택"><div style="flex:1;"><div class="trip-title">${trip.name}${badges}${categoryBadge}</div><div class="trip-date">${trip.date}</div></div></div><div style="display:flex;gap:0.3rem;"><button class="delete-btn edit" style="padding:0.3rem;background:var(--col-bg);color:var(--text-main)"><span class="material-symbols-rounded">edit</span></button><button class="delete-btn del" style="padding:0.3rem"><span class="material-symbols-rounded">close</span></button></div></div><div class="trip-info-row">${trip.address}${trip.bookedHotel ? `<div style="color:#E63946; font-size:0.8rem; font-weight:bold; margin-top:4px;"><span class="material-symbols-rounded" style="font-size:1.1em; vertical-align:middle;">hotel</span> 예약 숙소: ${trip.bookedHotel}</div>` : ''}</div>`;
         
         div.onclick = (e) => {
@@ -251,7 +255,12 @@ function renderTripList() {
         
         div.querySelector('.edit').onclick = () => openTripModal(trip.id, trip.name, trip.date, trip.assignee, trip.contact, trip.address, trip.scheduleUrl, trip.schedulePath, trip.qrUrl || '', trip.qrPath || '', trip.roomType, trip.bookedHotel);
         div.querySelector('.del').onclick = () => deleteTrip(trip.id);
-        list.appendChild(div);
+        
+        if (isPast) {
+            pastList.appendChild(div);
+        } else {
+            list.appendChild(div);
+        }
     });
 }
 

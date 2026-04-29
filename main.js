@@ -210,3 +210,71 @@ document.addEventListener('visibilitychange', () => {
         }, 100);
     }
 });
+
+// ----------------------------------------------------
+// 이스터에그 미니게임 (업무/출장 두더지 잡기)
+// ----------------------------------------------------
+let logoClickCount = 0;
+let logoClickTimer = null;
+let gameScore = 0;
+let gameTimeLeft = 30;
+let gameInterval = null;
+let moleInterval = null;
+let isGameRunning = false;
+
+setTimeout(() => {
+    const logo = document.getElementById('header-logo');
+    if (logo) {
+        logo.addEventListener('click', () => {
+            logoClickCount++;
+            clearTimeout(logoClickTimer);
+            
+            if (logoClickCount >= 5) {
+                logoClickCount = 0;
+                startMiniGame();
+            } else {
+                logoClickTimer = setTimeout(() => { logoClickCount = 0; }, 800); // 클릭 간격 0.8초로 넉넉하게 완화
+            }
+        });
+    }
+}, 500);
+
+function startMiniGame() {
+    if (isGameRunning) return;
+    isGameRunning = true; gameScore = 0; gameTimeLeft = 30;
+    document.getElementById('gameScore').textContent = gameScore; document.getElementById('gameTime').textContent = gameTimeLeft;
+    document.getElementById('miniGameModal').style.display = 'flex';
+    
+    const icons = ['work', 'flight_takeoff', 'mail', 'assignment', 'event_available'];
+    const moles = document.querySelectorAll('.game-mole');
+    
+    gameInterval = setInterval(() => {
+        gameTimeLeft--; document.getElementById('gameTime').textContent = gameTimeLeft;
+        if (gameTimeLeft <= 0) endMiniGame();
+    }, 1000);
+
+    moleInterval = setInterval(() => {
+        const idx = Math.floor(Math.random() * moles.length); const mole = moles[idx];
+        if (!mole.classList.contains('up')) {
+            const iconEl = mole.querySelector('.material-symbols-rounded');
+            const isBomb = Math.random() < 0.15; // 15% 확률로 폭탄 등장
+            
+            if (isBomb) { iconEl.textContent = 'bomb'; mole.style.backgroundColor = '#1F2937'; iconEl.style.color = '#F87171'; mole.dataset.type = 'bomb'; } 
+            else { iconEl.textContent = icons[Math.floor(Math.random() * icons.length)]; mole.style.backgroundColor = '#FCD34D'; iconEl.style.color = '#B45309'; mole.dataset.type = 'normal'; }
+            
+            mole.classList.add('up'); mole.classList.remove('whacked');
+            setTimeout(() => { mole.classList.remove('up'); }, Math.random() * 600 + 600); // 0.6 ~ 1.2초 유지
+        }
+    }, 600); // 0.6초마다 새로운 두더지 팝업 시도
+}
+
+function whackMole(mole) {
+    if (!isGameRunning || !mole.classList.contains('up')) return;
+    mole.classList.remove('up'); mole.classList.add('whacked');
+    
+    if (mole.dataset.type === 'bomb') { gameScore = Math.max(0, gameScore - 5); document.getElementById('gameScore').style.color = 'var(--danger)'; } 
+    else { gameScore += 10; document.getElementById('gameScore').style.color = 'var(--primary)'; }
+    document.getElementById('gameScore').textContent = gameScore; setTimeout(() => { document.getElementById('gameScore').style.color = ''; }, 300);
+}
+function endMiniGame() { clearInterval(gameInterval); clearInterval(moleInterval); isGameRunning = false; document.querySelectorAll('.game-mole').forEach(m => m.classList.remove('up')); customAlert(`게임 종료!\n\n최종 점수는 ${gameScore}점입니다.\n이제 다시 진짜 업무로 돌아갈 시간입니다! 💪`); }
+function closeGame() { if (isGameRunning) endMiniGame(); document.getElementById('miniGameModal').style.display = 'none'; }
