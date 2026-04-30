@@ -479,6 +479,25 @@ select option {
     background-color: var(--danger);
 }
 
+/* 휴가 취소 버튼 (보기 좋게 변경) */
+.cancel-btn {
+    background-color: var(--card-bg);
+    color: var(--text-muted);
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    border-radius: 6px;
+    font-weight: 600;
+    border: 1px solid var(--border-color);
+    transition: all 0.2s;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+}
+.cancel-btn:hover {
+    background-color: #FEE2E2;
+    color: var(--danger);
+    border-color: #FCA5A5;
+}
+
 /* ==================== 
    뷰 모드 범례 (Legend) & 시각화 스타일
 ==================== */

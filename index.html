@@ -107,8 +107,10 @@
                     <input type="text" id="taskInput" placeholder="새로운 업무를 입력하세요..." style="width: 100%; box-sizing: border-box; padding-left: 2.8rem;">
                 </div>
                 <div style="flex: 1; position: relative; min-width: 140px;">
-                    <span class="material-symbols-rounded" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 1.2rem;">person</span>
-                    <input type="text" id="assigneeInput" placeholder="담당자 (선택)" style="width: 100%; box-sizing: border-box; padding-left: 2.8rem;">
+                    <span class="material-symbols-rounded" style="position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 1.2rem; z-index: 1; pointer-events: none;">person</span>
+                    <select id="assigneeInput" class="search-input" style="width: 100%; box-sizing: border-box; padding-left: 2.8rem; padding-top: 0.8rem; padding-bottom: 0.8rem;">
+                        <option value="">담당자 (선택)</option>
+                    </select>
                 </div>
                 <select id="priorityInput" style="min-width: 140px;">
                     <option value="low">중요도: 낮음</option>
@@ -498,7 +500,9 @@
                     <input type="text" id="tripDate" class="date-select-btn" placeholder="출장일 선택" style="flex: 1;">
                 </div>
                 <div style="display: flex; gap: 0.8rem;">
-                    <input type="text" id="tripAssignee" placeholder="출장자 이름" class="search-input" style="flex: 1;">
+                    <select id="tripAssignee" class="search-input" style="flex: 1;">
+                        <option value="">출장자 이름 (선택)</option>
+                    </select>
                     <input type="text" id="tripContact" placeholder="현장 담당자 연락처" class="search-input" style="flex: 1;">
                 </div>
                 <input type="text" id="tripAddress" placeholder="출장지 주소" class="search-input" style="width: 100%; box-sizing: border-box;">

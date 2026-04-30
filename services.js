@@ -77,7 +77,7 @@ function renderLeaveUI() {
         const li = document.createElement('li'); 
         let statusText = l.status === 'approved' ? '승인됨' : (l.status === 'pending' ? '승인 대기중' : (l.status === 'cancel_requested' ? '취소 대기중' : (l.status === 'rejected' ? '반려됨' : '취소됨')));
         let color = l.status === 'approved' ? '#10B981' : (l.status === 'rejected' || l.status === 'cancel_requested' ? 'var(--danger)' : '#F59E0B');
-        let btnHtml = (l.status === 'pending' || l.status === 'approved') ? `<button class="delete-btn" onclick="cancelLeave('${l.id}')">취소</button>` : '';
+        let btnHtml = (l.status === 'pending' || l.status === 'approved') ? `<button class="cancel-btn" onclick="cancelLeave('${l.id}')">취소</button>` : '';
         li.innerHTML = `<div><div style="font-weight:600;">${l.date}</div><div style="font-size:0.8rem; color:${color}">${statusText}</div></div>${btnHtml}`;
         listEl.appendChild(li);
     });
@@ -547,6 +547,25 @@ db.ref('users').on('value', (snapshot) => {
 
 function renderMembersDirectory() {
     ['ceo', 'health_leader', 'health_member', 'marketing', 'bidding', 'unassigned'].forEach(id => { const el = document.getElementById('list-' + id); if (el) el.innerHTML = ''; });
+    
+    // 담당자 선택 드롭다운 목록을 승인된 워크스페이스 멤버로 동기화
+    const assigneeSelects = [document.getElementById('assigneeInput'), document.getElementById('tripAssignee')];
+    const usersList = Object.values(AppStore.getUsers()).filter(u => u.approved);
+    assigneeSelects.forEach(selectEl => {
+        if (selectEl && selectEl.tagName === 'SELECT') {
+            const currentVal = selectEl.value;
+            const defaultText = selectEl.id === 'tripAssignee' ? '출장자 이름 (선택)' : '담당자 (선택)';
+            selectEl.innerHTML = `<option value="">${defaultText}</option>`;
+            usersList.forEach(u => {
+                const opt = document.createElement('option');
+                opt.value = u.displayName;
+                opt.textContent = u.displayName;
+                selectEl.appendChild(opt);
+            });
+            if (currentVal) selectEl.value = currentVal;
+        }
+    });
+
     if (!auth.currentUser) return;
     const isAdmin = ADMIN_UIDS.includes(auth.currentUser.uid);
     if (document.getElementById('org-admin-guide')) document.getElementById('org-admin-guide').style.display = isAdmin ? 'block' : 'none';
